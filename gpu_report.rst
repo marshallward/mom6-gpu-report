@@ -335,7 +335,11 @@ TODO
 
 * Function calls
 
-* Complex derived types
+* Procedure pointers
+
+* Type-bound procedures (both static and virtual functions)
+
+* Complex derived types (esp. the open boundary conditions)
 
 * Excessive synchronization?
 
@@ -353,3 +357,11 @@ transfer reports.
 Nsight is obviously the way forward here, but there are some issues on my
 systems's software stack which I have been unable to overcome.  (Could be me,
 could be the system...)
+
+Memory monitoring
+-----------------
+
+We need some tooling here.  We have no idea how memory is being used.  CUDA
+memory?  Unified memory?  In-chip?  (probably not).
+
+Most likely we are not using our memory well.
