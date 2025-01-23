@@ -460,3 +460,41 @@ We need some tooling here.  We have no idea how memory is being used.  CUDA
 memory?  Unified memory?  In-chip?  (probably not).
 
 Most likely we are not using our memory well.
+
+
+Miscellaneous
+=============
+
+CPU parallelization
+-------------------
+
+Very basic testing suggests that we can replace existing OpenMP directives with
+the newer target-based directives.
+
+For the Nvidia compiler, using either ``-mp=multicore`` or ``-mp=autopar`` will
+distribute the loop over multiple threads.  But this has not been tested in
+production and needs more investigation.
+
+There is also no guarantee that this will work in other compilers.
+
+
+Compiler support
+----------------
+
+OpenMP offloading to target GPUs is a relatively new feature.  This was
+introduced in OpenMP 4.0, and didn't quite catch up to OpenACC until 5.x.
+
+*Our GCC tests in GitHub Actions cannot compile these tests!*
+
+.. code::
+
+   /home/runner/work/MOM6/MOM6/src/core/MOM_PressureForce_FV.F90:1687:18:
+
+    1687 |   !$omp   map(to: tv_tmp, tv_tmp%T, tv_tmp%S, tv, tv%eqn_of_state, EOSdom2d)
+         |                  1
+   Error: List item ‘tv_tmp’ with allocatable components is not permitted in map clause at (1)
+
+Allocatables in derived types were added in 5.0 and is still not supported in
+GCC 14.
+
+https://gcc.gnu.org/onlinedocs/gcc-13.1.0/libgomp/OpenMP-5_002e0.html
