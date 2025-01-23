@@ -59,27 +59,27 @@ Kernel DSLs
 -----------
 
 CUDA and HIP are languages which target compilation to GPU bytecode.  They are
-primarily used to target Nvidia and AMD devices, respectively, but there is
-some limited cross-platform support.
+primarily designed for particular platform, but they also aspire for some
+generality and there is some limited cross-platform support.
 
 Program loops are written as kernels in the native language, which can be
 compiled into GPU bytecode.  These kernels are interfaced to a higher level
 language such as C.
 
-.. code::
+.. code:: cpp
 
-   // Defining the kernel
+   // Define the kernel
    __global__ void add(float *a, float *b, float *c, float *d) {
       if (blockIdx.x < N)
          a[i] = b[i] * c[i] + d[i];
       }
    }
 
-   // Calling the kernel from main()
+   // Call the kernel from main()
    vector_add<<n,1>>(a, b, c, d, n);
 
-Languages like CUDA cannot compiled into CPU bytecode, so multiple
-implementations of a loop may be required.
+Languages like CUDA are not compiled into CPU bytecode, so a separate CPU
+implementation loop may be required for cross-platform support.
 
 
 Other options
@@ -91,6 +91,8 @@ libraries, but could presumably be interfaced to other languages like Fortran.
 
 Other languages try to entirely abstract the GPU interface.  Python and Julia
 have extensive APIs into various GPU kernel framework.
+
+.. TODO examples?
 
 
 Implementation in MOM6
@@ -164,10 +166,13 @@ Compilation requires the following flags::
 
 ``-mp=gpu`` enables GPU migration of OpenMP directives.  ``-Mnofma`` is used
 for reproducibility, since Nvidia compilers ignore parentheses when applying
-FMA instructions.  ``-Minfo`` is useful for monitoring GPU instructions.
+FMA instructions.  ``-Minfo`` is useful for monitoring GPU instructions,
 although it can be a bit overwhelming.
 
-Note that ``-mp=gpu`` needs to be applied during both compiling and linking.
+Note that both compiler and linker require ``-mp=gpu``.  Internally, the flag
+is used to access CUDA libraries.
+
+.. TODO: Error for missing LDFLAGS?
 
 
 Non-Nvidia devices
@@ -175,6 +180,42 @@ Non-Nvidia devices
 
 I have not yet done any testing on AMD or Intel GPUs.  Consider this a
 placeholder for future documentation.
+
+
+Testing in MOM6
+===============
+
+Running and testing the code changes is still a work in progress.  The current
+procedure is very simple and somewhat ad-hoc.  I will describe below my
+process.
+
+1. Compile the CPU and GPU executables.  Aside from GPU flags, all others
+   should be identical.
+
+   Currently I use the MOM6-examples ``ocean_only`` Makefile.  (Details to be
+   added.)
+
+2. Run the ``double_gyre`` test.  Verify no runtime errors.
+
+   This is a layered test with no thermodynamics and modest physics.  **Porting
+   this test to GPU is our first milestone.**
+
+   Often the model will quickly go unstable and fail if something was not
+   correctly transferred.
+
+3. Verify equivalence of ``ocean.stats`` from CPU and GPU runs.
+
+   We are prepared to relax this requirement if necessary.  But so far this
+   equivalance has held, and we don't want to give it up lightly.
+
+4. Repeat with ``benchmark``.  This a flexible test which strongly resembles
+   past production runs.  It includes thermodynamics.  At a minimum, we
+   want to ensure that our changes do not break this run.  Ideally, we would
+   like to also move the thermodynamics onto the GPU.  (But see "Known
+   Issues".)
+
+At some point, we should extend our CI testing to GPUs, but this has proven to
+be a decent procedure for exploring OpenMP capability.
 
 
 MOM6 Directive Implementation
@@ -186,8 +227,8 @@ and mistakes -- that we have learned on the way.
 
 Our first goal is to try and migrate the dynamic core of the model.  We
 specifically focus on the split timestep RK2 solver,
-``MOM_dynamics_split_RK2.F90``.  We should aspire for bitwise identical answers
-with the CPU solution.
+``MOM_dynamics_split_RK2.F90``.  We aspire for bitwise identical answers with
+the CPU solution.
 
 Ideally, the fields associated with the dynamic core should remain on the GPU
 for the entire run.  But the work will have to be done in pieces, often one
@@ -203,7 +244,7 @@ kernel is bounded by ``$!omp target`` directives.
 The following creates one GPU kernel with one serial loop (``k``) and two
 parallelized loops (``i``, ``j``).
 
-.. code::
+.. code:: fortran
 
    !$omp target
    do k=1,nz
@@ -219,26 +260,46 @@ parallelized loops (``i``, ``j``).
    enddo
    !$omp end target
 
-Main notes:
+Kernel is bounded by ``!$omp target`` ... ``!$omp end target``.  This defines a
+unit of execution on the GPU.  A kernel can contain multiple loops.
 
-* Kernel is bounded by ``!$omp target`` ... ``!$omp end target``.  This defines
-  a unit of execution on the GPU.  A kernel can contain multiple loops.
+``collapse(N)`` tells it to merge the nested loop into a single large loop.
+This can presumably avoid pipelining issues across dimensions.  For now, this
+should be considered an optimization and not required for porting.
 
-* ``!$omp parallel loop`` directs a loop to be parallelized.  The compiler
-  largely decides how to distribute this loop.
 
-  Note that ``loop`` is a newer construct introduced to simplify
-  parallelization.  Many existing online documentation uses a more explict form
-  which separates the loop into ``teams``.  Something like this::
+``!$omp parallel loop``
+~~~~~~~~~~~~~~~~~~~~~~~
 
-    !$omp target teams distribute parallel for
+This directive is shorthand for the more complete declaration::
 
-  but ``loop`` moves this fine-tuning to the compiler.  (At least that's my
-  take on things.  Verify?)
+   !omp teams distribute parallel do simd
 
-* ``collapse(N)`` tells it to merge the nested loop into a single large loop.
+``teams`` are collections of threads with shared resources.  In an Nvidia GPU,
+the teams are SM processors, and loops is parallelized over the threads of the
+SM processor.
 
-  .. NOTE afaik N is the number of loops, but it could be N-1?
+A possibly faster form of the previous loop is shown below.
+
+.. code:: fortran
+
+   !$omp target
+   !$omp teams distribute
+   do k=1,nz
+     !$omp parallel do collapse(2)
+     do j=js,je ; do I=Isq,Ieq
+       u_bc_accel(I,j,k) = (CS%CAu_pred(I,j,k) + CS%PFu(I,j,k)) + CS%diffu(I,j,k)
+     enddo ; enddo
+
+     !$omp parallel do collapse(2)
+     do J=Jsq,Jeq ; do i=is,ie
+       v_bc_accel(i,J,k) = (CS%CAv_pred(i,J,k) + CS%PFv(i,J,k)) + CS%diffv(i,J,k)
+     enddo ; enddo
+   enddo
+   !$omp end target
+
+The ``simd`` directs the team to use SIMD-like instructions over the threads.
+This is almost always the default behavior, so it is often omitted.
 
 
 Data Migration
@@ -253,36 +314,53 @@ operations occur outside of any compute kernels.
 To move an array from host to device, or vice versa::
 
    !$omp target enter data map(to: x)
+
+This allocates a new ``x`` on the GPU and sets the values from the CPU.  **It
+will overwrite an existing ``x``!**
+
+To move data from GPU back to CPU::
+
    !$omp target exit data map(from: x)
 
-``move(from: x)`` will deallocate ``x`` on the GPU after transferring its
-values to the CPU.
+**This will also deallocate ``x`` on the GPU.**
 
-.. But ``map(to: x)`` does not deallocate on the CPU, right?
+Arrays can be independently allocated or deleted on the GPU.  This block
+allocates ``h`` on the GPU but does not fill its data.
 
-Arrays can be allocated or deleted on the GPU, independent of the host::
+.. code:: fortran
 
-   !$omp target enter data map(alloc: x)
-   !$omp target exit data map(delete: x)
+   allocate(CS%h(isd:ied,jsd:jed,nz))
+   CS%h(:,:,:) = GV%Angstrom_H
+   !$omp target enter data map(alloc: CS%h)
 
-This can avoid unnecessary transfers.
+This block deallocates ``h`` on the GPU.
 
-If you want to transfer the *values* of an array, but keep them on the device,
-use ``update``::
+.. code:: fortran
 
-   !$omp target update to(x)
-   !$omp target update from(x)
+   deallocate(CS%h)
+   !$omp target exit data map(delete: h)
 
-``to`` and ``from`` are with respect to the target GPU.
+If you want to transfer the *values* to an array which already exists, use
+``update``.  ``to`` and ``from`` are with respect to the target GPU.
 
-Note that OpenACC directives can use the ``present()`` modifier to explicitly
-declare an array is on the GPU.
+.. code:: fortran
+
+  !$omp target update to(h)
+  call PressureForce(h, tv, CS%PFu, CS%PFv, G, GV, US, CS%PressureForce_CSp, &
+                     CS%ALE_CSp, p_surf, CS%pbce, CS%eta_PF)
+  !$omp target update from(CS%PFu, CS%PFv, CS%pbce, CS%eta_PF)
+
+OpenMP has a ``present()`` modifier to explicitly declare that an array is
+already on the target GPU.  But most compilers still do not support this
+modifier.  In Nvidia, the runtime appears to handle this well and avoids
+redundant transfers, so it is probably not necessary to use ``present()``.  But
+this is still something that should be monitored closely.
 
 
 Data regions
 ------------
 
-An array can be defined to only exist within a particular region.
+An array can be defined to exist within a particular region.
 
 .. code:: fortran
 
@@ -327,6 +405,8 @@ MOM6 variables are defined over multiple files, and we need to ensure that
 there are no unnecessary data transfers as data is moved across functions of
 different translation units.
 
+For example, the grid object is copied to GPU
+
 
 Known Issues
 ============
@@ -334,6 +414,8 @@ Known Issues
 TODO
 
 * Function calls
+
+  How to use ``!$omp begin declare target`` ??
 
 * Procedure pointers
 
@@ -357,6 +439,19 @@ transfer reports.
 Nsight is obviously the way forward here, but there are some issues on my
 systems's software stack which I have been unable to overcome.  (Could be me,
 could be the system...)
+
+
+Common Errors
+-------------
+
+TODO.  Try to detail these as they are uncovered.
+
+* (Runtime) "partially present"
+
+  Typically this means that an array is not on the device.
+
+*
+
 
 Memory monitoring
 -----------------
