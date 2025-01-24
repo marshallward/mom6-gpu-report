@@ -165,18 +165,20 @@ device.
 Compilation instructions
 ------------------------
 
-Compilation requires the following flags::
+I am currently using the following flags.
+
+.. code:: make
 
    FCFLAGS += -mp=gpu -Mnofma -Minfo=all
    LDFLAGS += -mp=gpu
 
 ``-mp=gpu`` enables GPU migration of OpenMP directives.  ``-Mnofma`` is used
 for reproducibility, since Nvidia compilers ignore parentheses when applying
-FMA instructions.  ``-Minfo`` is useful for monitoring GPU instructions,
-although it can be a bit overwhelming.
+FMA instructions.  ``-Minfo`` is not required but is useful for monitoring GPU
+instructions, although it can be a bit overwhelming.
 
-Note that both compiler and linker require ``-mp=gpu``.  Internally, the flag
-is used to access CUDA libraries.
+Both compiler and linker require ``-mp=gpu``.  Internally, the flag is used to
+access CUDA libraries.
 
 .. TODO: Error for missing LDFLAGS?
 
@@ -322,13 +324,13 @@ To move an array from host to device, or vice versa::
    !$omp target enter data map(to: x)
 
 This allocates a new ``x`` on the GPU and sets the values from the CPU.  **It
-will overwrite an existing ``x``!**
+will overwrite an existing x!**
 
 To move data from GPU back to CPU::
 
    !$omp target exit data map(from: x)
 
-**This will also deallocate ``x`` on the GPU.**
+**This will also deallocate x on the GPU.**
 
 Arrays can be independently allocated or deleted on the GPU.  This block
 allocates ``h`` on the GPU but does not fill its data.
@@ -361,6 +363,27 @@ already on the target GPU.  But most compilers still do not support this
 modifier.  In Nvidia, the runtime appears to handle this well and avoids
 redundant transfers, so it is probably not necessary to use ``present()``.  But
 this is still something that should be monitored closely.
+
+
+Partial Data Transfer
+~~~~~~~~~~~~~~~~~~~~~
+
+In Fortran, a data transfer will copy the entire array between host and target
+if the index bounds are omitted.  This is an advantage over C and C++, whose
+arrays use pointer-based allocation and their size must be independently
+tracked.
+
+When necessary, it is possible to restrict transfer to an array slice.
+
+.. code:: fortran
+
+  !$omp target update from(e(:,:,nz+1))
+  call calc_SAL(SSH, e_sal, G, CS%SAL_CSp, tmp_scale=US%Z_to_m)
+  do j=Jsq,Jeq+1 ; do i=Isq,Ieq+1
+    e(i,j,nz+1) = e(i,j,nz+1) - e_sal(i,j)
+  enddo ; enddo
+
+  !$omp target update to(e(:,:,nz+1))
 
 
 Data regions
