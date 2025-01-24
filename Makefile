@@ -1,5 +1,5 @@
-#PANDOC = pandoc
-PANDOC = /home/marshall/src/pandoc-3.2.1/bin/pandoc
+PANDOC = pandoc
+#PANDOC = /home/marshall/src/pandoc-3.2.1/bin/pandoc
 SRC = gpu_report.rst
 OUT = report.pdf
 

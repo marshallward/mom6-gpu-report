@@ -162,8 +162,8 @@ compilation, but we may need to be aware of the respective memory on each
 device.
 
 
-Compilation instructions
-------------------------
+Enabling OpenMP Offloading
+--------------------------
 
 I am currently using the following flags.
 
@@ -183,8 +183,8 @@ access CUDA libraries.
 .. TODO: Error for missing LDFLAGS?
 
 
-Non-Nvidia devices
-------------------
+Non-Nvidia devices and Compilers
+--------------------------------
 
 I have not yet done any testing on AMD or Intel GPUs.  Consider this a
 placeholder for future documentation.
@@ -192,6 +192,28 @@ placeholder for future documentation.
 
 Testing in MOM6
 ===============
+
+Compiling
+---------
+
+Current testing is restricted to the ocean-only driver.  The MOM6-examples
+repository includes a Makefile for building the executable.
+
+.. code:: sh
+
+   $ git clone https://github.com/NOAA-GFDL/MOM6-examples.git --recursive
+   $ cd MOM6-examples/ocean_only
+   $ CC=nvcc \
+       FC=nvfortran \
+       FCFLAGS="-g -O0 -mp=gpu -Mnofma -Minfo-all" \
+       LDFLAGS="-mp=gpu" \
+       make -j
+
+(Not yet tested... but you get the idea.)
+
+
+Procedure
+---------
 
 Running and testing the code changes is still a work in progress.  The current
 procedure is very simple and somewhat ad-hoc.  I will describe below my
