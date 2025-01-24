@@ -2,19 +2,23 @@
 MOM6 GPU activities at GFDL
 ===========================
 
+:author: Marshall Ward
+:organization: NOAA-GFDL
+:geometry: margin=3cm
+
 Summary of GPU-related activities around MOM6 at GFDL.
 
 
 Motivation
 ==========
 
-* Utilizing new platforms
+Utilizing new platforms
 
   GPUs represent a new compute device which we currently cannot use.  They are
   becoming widespread in HPC systems, and we are denying such users the ability
   to run MOM6.
 
-* Performance improvements
+Performance improvements
 
   GPUs can provide higher throughput in certain situations.  A typical GPU
   device has a greater number of compute cores, and a job may run faster if its
@@ -41,7 +45,7 @@ proprietary GPU bytecode.
 Directives are incorporated into an existing language (C, C++, Fortran).  This
 allows an existing codebase to be compiled to CPU and GPU targets.
 
-.. code::
+.. code:: fortran
 
    !$omp target
    !$omp parallel loop
@@ -135,7 +139,9 @@ Current testing is using the Nvidia's ``nvfortran`` compiler.::
 Nvidia is transitioning to a new LLVM-based ``flang`` compiler.  Future major
 development efforts will be directed to ``flang``, including OpenMP support.
 
-We are currently testing on an Ampere A100 GPU.::
+We are currently testing on an Ampere A100 GPU.
+
+.. code::
 
    $ nvidia-smi
    +-----------------------------------------------------------------------------------------+
