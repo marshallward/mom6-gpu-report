@@ -40,7 +40,8 @@ Development Options
 There are several options for compiling general-purpose source code into
 proprietary GPU bytecode.
 
-* Directives: OpenMP, OpenACC
+Directive-based Methods
+-----------------------
 
 Directives are incorporated into an existing language (C, C++, Fortran).  This
 allows an existing codebase to be compiled to CPU and GPU targets.
@@ -298,10 +299,11 @@ This can presumably avoid pipelining issues across dimensions.  For now, this
 should be considered an optimization and not required for porting.
 
 
-``!$omp parallel loop``
-~~~~~~~~~~~~~~~~~~~~~~~
+The ``!$omp parallel loop`` Directive
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This directive is shorthand for the more complete declaration::
+This directive is a relatively new addition to OpenMP.  It can be considered
+shorthand for the following directive::
 
    !omp teams distribute parallel do simd
 
@@ -370,8 +372,8 @@ This block deallocates ``h`` on the GPU.
    deallocate(CS%h)
    !$omp target exit data map(delete: h)
 
-If you want to transfer the *values* to an array which already exists, use
-``update``.  ``to`` and ``from`` are with respect to the target GPU.
+If you want to exchange values between a array which already exists on the GPU,
+use ``update``.
 
 .. code:: fortran
 
@@ -380,11 +382,40 @@ If you want to transfer the *values* to an array which already exists, use
                      CS%ALE_CSp, p_surf, CS%pbce, CS%eta_PF)
   !$omp target update from(CS%PFu, CS%PFv, CS%pbce, CS%eta_PF)
 
-OpenMP has a ``present()`` modifier to explicitly declare that an array is
-already on the target GPU.  But most compilers still do not support this
-modifier.  In Nvidia, the runtime appears to handle this well and avoids
-redundant transfers, so it is probably not necessary to use ``present()``.  But
-this is still something that should be monitored closely.
+The ``to`` and ``from`` modifiers are with respect to the target GPU.
+
+.. Where to add this?  (If at all?)
+
+   OpenMP has a ``present()`` modifier to explicitly declare that an array is
+   already on the target GPU.  But most compilers still do not support this
+   modifier.  In Nvidia, the runtime appears to handle this well and avoids
+   redundant transfers, so it is probably not necessary to use ``present()``.
+   But this is still something that should be monitored closely.
+
+
+Scalar data transfer
+~~~~~~~~~~~~~~~~~~~~
+
+OpenMP will automatically identify and transfer any scalar data between host
+and target, so these can be omitted from data transfer directives.
+
+
+Derived type transfers
+~~~~~~~~~~~~~~~~~~~~~~
+
+Derived types should be explicitly transferred to the GPU.  If the derived
+type contains any allocatable arrays, then these must also be separately
+allocated and transferred.
+
+The example below shows the data transfer of the MOM6 grid object and some of
+its arrays.
+
+.. code:: fortran
+
+   !$omp target enter data map(to: G)
+   !$omp target enter data map(to: G%dxCu, G%dyCv)
+   !$omp target enter data map(to: G%IdxCu, G%IdyCv)
+   !$omp target enter data map(to: G%mask2dBu, G%mask2dT)
 
 
 Partial Data Transfer
@@ -395,7 +426,9 @@ if the index bounds are omitted.  This is an advantage over C and C++, whose
 arrays use pointer-based allocation and their size must be independently
 tracked.
 
-When necessary, it is possible to restrict transfer to an array slice.
+When necessary, it is possible to restrict transfer to an array slice.  The
+example below adjusts the bottom layer to account for self-attraction and
+loading.
 
 .. code:: fortran
 
@@ -404,14 +437,15 @@ When necessary, it is possible to restrict transfer to an array slice.
   do j=Jsq,Jeq+1 ; do i=Isq,Ieq+1
     e(i,j,nz+1) = e(i,j,nz+1) - e_sal(i,j)
   enddo ; enddo
-
   !$omp target update to(e(:,:,nz+1))
 
 
 Data regions
 ------------
 
-An array can be defined to exist within a particular region.
+An array can be defined to exist within a particular region.  The example below
+uses the temporary array ``dM`` when applying a reduced gravity adjustment to
+the pressure force.
 
 .. code:: fortran
 
@@ -446,7 +480,7 @@ the ``!$omp target`` directive.
    !$omp end target
 
 but for more complex blocks with multiple kernels, it can be a valuable way to
-define the scope of a variable.
+define the scope of a variable.  (TODO: Show a more complex example.)
 
 
 Data management across files
@@ -456,17 +490,51 @@ MOM6 variables are defined over multiple files, and we need to ensure that
 there are no unnecessary data transfers as data is moved across functions of
 different translation units.
 
-For example, the grid object is copied to GPU
+There is no restriction to allocating and transferring an array in one file and
+using the array in a kernel defined in another file.  The compiler appears to
+correctly track the array address across files.  However, the user must be
+careful to ensure that the arrays exist, or errors will be raised.  (Usually a
+"partially present" error.)
+
+
+Procedure calls
+---------------
+
+Procedures can be compiled to GPU bytecode with ``!$omp declare target``.
+
+.. code:: fortran
+
+   function cuberoot(x)
+      real, intent(in) :: x
+      real :: cuberoot
+      !$omp declare target
+
+      cuberoot = x**(1./3.)
+   end subroutine
+
+This allows the procedure call to reside within a kernel, or even within a
+loop.
+
+.. code:: fortran
+
+   !$omp target
+   !$omp parallel loop
+   do i = 1, N
+      r(i) = cuberoot(u(i))
+   enddo
+   !$omp end target
+
+(TODO: Find an in-code example)
+
+This has not been very useful in practice.  A procedure can only be compiled if
+its entire contents can be run on the GPU, and we still encounter a lot of
+constructs which do not work.
 
 
 Known Issues
 ============
 
 TODO
-
-* Function calls
-
-  How to use ``!$omp begin declare target`` ??
 
 * Procedure pointers
 
@@ -495,7 +563,7 @@ could be the system...)
 Common Errors
 -------------
 
-TODO.  Try to detail these as they are uncovered.
+Sadly, most errors are either generic
 
 * (Runtime) "partially present"
 
