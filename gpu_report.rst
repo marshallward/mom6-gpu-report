@@ -259,7 +259,7 @@ subroutines/functions in those sources files which use up the most time.
 .. code::
 
    - [ ] MOM_continuity_PPM.F90               1.207831s
-      - [ ] meridional_flux_adjust            0.205482s      
+      - [ ] meridional_flux_adjust            0.205482s - Edward
       - [ ] zonal_flux_adjust                 0.170399s
       - [ ] zonal_flux_layer                  0.095223s
       - [ ] zonal_flux_layer                  0.090211s
