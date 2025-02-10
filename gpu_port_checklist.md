@@ -6,11 +6,11 @@ test - sorted first by source files which use up the most CPU time, then by the
 subroutines/functions in those sources files which use up the most time.
 
 - [ ] MOM_continuity_PPM.F90               1.207831s
-   - [x] meridional_flux_adjust            0.205482s **Edward**
-   - [ ] zonal_flux_adjust                 0.170399s
-   - [ ] zonal_flux_layer                  0.095223s
+   - [x] meridional_flux_adjust            0.205482s
+   - [ ] zonal_flux_adjust                 0.170399s **Edward**
+   - [ ] zonal_flux_layer                  0.095223s **Edward**
    - [ ] set_merid_bt_cont                 0.080188s
-   - [x] merid_flux_layer                  0.070164s **Edward**
+   - [x] merid_flux_layer                  0.070164s
    - [ ] set_zonal_bt_cont                 0.060141s
    - [ ] ppm_reconstruction_x              0.045106s
    - [ ] zonal_mass_flux                   0.045106s
