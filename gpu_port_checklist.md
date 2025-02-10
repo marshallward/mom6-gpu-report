@@ -127,6 +127,9 @@ variables in an if statement.
 * After `enter/exit` statements are written to keep data on GPU, time taken
 is down to 182.6s (down 83s), but still much slower as `meridional_flux_adjust`
 is still called ~120k times leading to lots of data transfer to/from GPU.
+* After fusing some of the kernels, brought down the time to 171.5s
+   * Conditionals that determine whether loops are executed didn't seem to like
+   being inside `target` regions (would slow down the execution).
 
 #### profiling
 
