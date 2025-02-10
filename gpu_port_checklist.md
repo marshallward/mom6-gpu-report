@@ -39,9 +39,9 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] vertvisc_limit_vel                0.035082s
 - [ ] MOM_hor_visc.F90                     0.200470s
    - [ ] horizontal_viscosity              0.200470s
-- [ ] MOM_CoriolisAdv.F90                  0.125294s
-   - [ ] coradcalc                         0.090211s
-   - [ ] gradke                            0.035082s
+- [ ] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
+   - [ ] coradcalc                         0.090211s **Marshall**
+   - [ ] gradke                            0.035082s **Marshall**
 - [ ] diag_manager.F90                     0.070164s
    - [ ] send_data_3d                      0.070164s
 - [ ] MOM_set_viscosity.F90                0.055129s
@@ -49,7 +49,7 @@ subroutines/functions in those sources files which use up the most time.
 - [ ] MOM_dynamics_split_RL2.F90           0.035082s
    - [ ] step_mom_dyn_split_rk2            0.030070s
    - [ ] register_restarts_dyn_split_rk2   0.005012s
-- [ ] MOM_PressureForce_FV.F90             0.025059s
+- [ ] MOM_PressureForce_FV.F90             0.025059s **Marshall**
    - [ ] pressureforce_fv_bouss            0.025059s **Marshall**
 - [ ] MOM.F90                              0.010023s
    - [ ] extract_surface_state             0.010023s

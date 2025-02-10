@@ -384,9 +384,7 @@ use ``update``.
 
 The ``to`` and ``from`` modifiers are with respect to the target GPU.
 
-.. Where to add this?  (If at all?)
-
-   OpenMP has a ``present()`` modifier to explicitly declare that an array is
+.. OpenMP has a ``present()`` modifier to explicitly declare that an array is
    already on the target GPU.  But most compilers still do not support this
    modifier.  In Nvidia, the runtime appears to handle this well and avoids
    redundant transfers, so it is probably not necessary to use ``present()``.
@@ -622,3 +620,58 @@ Allocatables in derived types were added in 5.0 and is still not supported in
 GCC 14.
 
 https://gcc.gnu.org/onlinedocs/gcc-13.1.0/libgomp/OpenMP-5_002e0.html
+
+
+Loop dependencies within a kernel
+---------------------------------
+
+It is still not clear to me when loop dependencies can be managed within a
+kernel.  For example, ``gradKE()`` in ``MOM_CoriolisAdv.F90``.
+
+.. code:: fortran
+
+   !$omp target
+   if (CS%KE_Scheme == KE_ARAKAWA) then
+     !$omp parallel loop collapse(2)
+     do j=Jsq,Jeq+1 ; do i=Isq,Ieq+1
+       KE(i,j) = ( ( (G%areaCu( I ,j)*(u( I ,j,k)*u( I ,j,k))) + &
+                     (G%areaCu(I-1,j)*(u(I-1,j,k)*u(I-1,j,k))) ) + &
+                   ( (G%areaCv(i, J )*(v(i, J ,k)*v(i, J ,k))) + &
+                     (G%areaCv(i,J-1)*(v(i,J-1,k)*v(i,J-1,k))) ) )*0.25*G%IareaT(i,j)
+     enddo ; enddo
+   elseif (CS%KE_Scheme == KE_SIMPLE_GUDONOV) then
+     ! ...
+   endif
+
+   !*** Split the kernel here??
+
+   ! These loops depend on KE(:,:)
+
+   !$omp parallel loop collapse(2)
+   do j=js,je ; do I=Isq,Ieq
+     KEx(I,j) = (KE(i+1,j) - KE(i,j)) * G%IdxCu(I,j)
+   enddo ; enddo
+
+   ! Term - d(KE)/dy.
+   !$omp parallel loop collapse(2)
+   do J=Jsq,Jeq ; do i=is,ie
+     KEy(i,J) = (KE(i,j+1) - KE(i,j)) * G%IdyCv(i,J)
+   enddo ; enddo
+   !$omp end target
+
+If I do not split the ``KE`` from ``KE[xy]``, then there are errors in some
+experiments.  I can't definitively blame this on concurrently or
+parallelization, but there are numerical errors.  Splitting the kernels
+restores the solution.
+
+This is not the only instance of data dependencies across loops within a
+kernel.  Yet this is the example which chokes.
+
+* Do I need to somehow express this dependency in the ``parallel loop``
+  directive?
+
+* Am I *supposed* to split the kernel?  Is that the correct move?
+
+Feedback and/or futher study is needed here.  (Maybe even just a read of the
+OpenMP standard?)
+
