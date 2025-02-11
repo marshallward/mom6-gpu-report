@@ -5,13 +5,13 @@ Below are a list of subroutines/functions that are used in the `double_gyre`
 test - sorted first by source files which use up the most CPU time, then by the
 subroutines/functions in those sources files which use up the most time.
 
-- [ ] MOM_continuity_PPM.F90               1.207831s
-   - [x] meridional_flux_adjust            0.205482s
-   - [ ] zonal_flux_adjust                 0.170399s **Edward**
-   - [ ] zonal_flux_layer                  0.095223s **Edward**
-   - [ ] set_merid_bt_cont                 0.080188s
-   - [x] merid_flux_layer                  0.070164s
-   - [ ] set_zonal_bt_cont                 0.060141s
+- [ ] MOM_continuity_PPM.F90               1.207831s **Edward**
+   - [x] meridional_flux_adjust            0.205482s **Edward**
+   - [x] zonal_flux_adjust                 0.170399s **Edward**
+   - [x] zonal_flux_layer                  0.095223s **Edward**
+   - [ ] set_merid_bt_cont                 0.080188s **Edward**
+   - [x] merid_flux_layer                  0.070164s **Edward**
+   - [ ] set_zonal_bt_cont                 0.060141s **Edward**
    - [ ] ppm_reconstruction_x              0.045106s
    - [ ] zonal_mass_flux                   0.045106s
    - [ ] ppm_reconstruction_y              0.040094s
@@ -160,3 +160,13 @@ mapped as `tofrom` even though the entire slice appears to be overwritten.
 * I'm avoiding adding `target enter data` statements in this subroutine 
 as the program got slower when I added them (for this subroutine). I'm also not
 sure what happens when multiple `target enter data` address the same data.
+* **Have yet to test whether the second loop (guarded by `if (local_open_BC) then`) was ported correctly**
+
+### zonal_flux_adjust
+
+* close to identical structure to `meridional_flux_adjust`
+
+### zonal_flux_layer
+
+* close to identical structure to `merid_flux_layer`
+* **Have yet to test whether the second loop (guarded by `if (local_open_BC) then`) was ported correctly**
