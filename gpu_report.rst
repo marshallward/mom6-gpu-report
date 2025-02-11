@@ -557,6 +557,10 @@ Nsight is obviously the way forward here, but there are some issues on my
 systems's software stack which I have been unable to overcome.  (Could be me,
 could be the system...)
 
+Some success has been had with ``nsys profile -t openacc --stats=true``, as it
+collects both CUDA API calls and OpenACC regions (NVIDIA compilers maps OpenMP
+constructs to OpenACC ones).
+
 
 Common Errors
 -------------
@@ -565,7 +569,8 @@ Sadly, most errors are either generic
 
 * (Runtime) "partially present"
 
-  Typically this means that an array is not on the device.
+  Typically this means that an array is not on the device or an allocated array
+  or array section hasn't been freed e.g. in an exit data statement.
 
 *
 
