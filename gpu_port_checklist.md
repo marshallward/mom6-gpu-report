@@ -9,14 +9,14 @@ subroutines/functions in those sources files which use up the most time.
    - [x] meridional_flux_adjust            0.205482s **Edward**
    - [x] zonal_flux_adjust                 0.170399s **Edward**
    - [x] zonal_flux_layer                  0.095223s **Edward**
-   - [ ] set_merid_bt_cont                 0.080188s **Edward**
+   - [x] set_merid_bt_cont                 0.080188s **Edward**
    - [x] merid_flux_layer                  0.070164s **Edward**
-   - [ ] set_zonal_bt_cont                 0.060141s **Edward**
+   - [x] set_zonal_bt_cont                 0.060141s **Edward**
    - [ ] ppm_reconstruction_x              0.045106s
-   - [ ] zonal_mass_flux                   0.045106s
+   - [ ] zonal_mass_flux                   0.045106s **Edward**
    - [ ] ppm_reconstruction_y              0.040094s
    - [ ] zonal_flux_thickness              0.040094s
-   - [ ] meridional_mass_flux              0.030070s
+   - [ ] meridional_mass_flux              0.030070s **Edward**
    - [ ] ppm_limit_pos                     0.030070s
    - [ ] meridional_flux_thickness         0.020047s
    - [ ] meridional_edge_thickness         0.005012s
