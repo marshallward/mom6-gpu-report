@@ -437,6 +437,23 @@ loading.
   enddo ; enddo
   !$omp target update to(e(:,:,nz+1))
 
+However, be careful with arrays with rank 3 and above! Consider the below 
+declaration and subsequent data transfer:
+
+.. code:: fortran
+
+   real:: a(10, 20, 30)
+   
+   !$omp target enter data map(to: a(3:8, 3:18, :))
+   ... do work ...
+   !$omp target exit data map(from: a(3:8, 3:18, :))
+
+Both the ``enter`` and ``exit`` statements trigger ``(18-3+1)*30 = 480`` 
+transfers of ``4*(8-3+1) = 24`` bytes of data to/from the GPU! So, depending on
+the size/number of slices, it may be better to send more data than you need.
+For some reason, ``map(to: a(3:8, :, :))`` triggers only one transfer.
+
+I'm not sure of the exact reason why this happens!
 
 Data regions
 ------------
@@ -479,6 +496,62 @@ the ``!$omp target`` directive.
 
 but for more complex blocks with multiple kernels, it can be a valuable way to
 define the scope of a variable.  (TODO: Show a more complex example.)
+
+
+Pseudo-profiling for tracking data transfers
+--------------------------------------------
+
+NVIDIA compilers have an undocumented environment variable that you can set to
+monitor data transfers triggered by the OpenMP/OpenACC runtime e.g.
+``NV_ACC_NOTIFY=2 ../build/MOM6`` will dump a bunch of information to your
+terminal like:
+
+.. code::
+   
+   upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
+       threadid=1 variable=dt bytes=8
+   upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
+        threadid=1 variable=h_in(ish-1:ieh,:,:) bytes=34560
+   upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
+        threadid=1 variable=h_w(ish-1:ieh,:,:) bytes=34560
+   upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
+        threadid=1 variable=h_e(ish-1:ieh,:,:) bytes=34560
+   upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
+        threadid=1 variable=g bytes=12808
+   ... a lot more
+
+The information can be manipulated to find where your transfers are happening.
+For example, you're porting a subroutine and want to find what transfers are
+happening in that subroutine:
+
+.. code:: bash
+
+   NV_ACC_NOTIFY=2 ../build/MOM6 2>&1 > mom6-dump.txt
+   grep zonal_flux_layer | sort mom6-dump.txt | uniq -c | sort -n
+
+Which yields the number of transfers for a particular variable in ascending 
+order:
+
+.. code::
+
+   ... a lot more lines
+    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+          line=2061 device=0 threadid=1 variable=h_s(ish:ieh,j:j+1) bytes=704
+    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+          line=2061 device=0 threadid=1 variable=por_face_areav(ish:ieh,j) bytes=352
+    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+          line=2061 device=0 threadid=1 variable=visc_rem(ish:ieh) bytes=352
+   213036 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+          line=2061 device=0 threadid=1 variable=.attach. bytes=200
+   213036 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+          line=2093 device=0 threadid=1 variable=.detach. bytes=8
+
+This information you can use to target variables to map in data regions or when
+using ``enter/exit`` statements. Additionally, you can `wc -l mom6-dump.txt` 
+before and after to see whether your changes successfully reduced the number of
+transfers.
+
+NB: ``NV_ACC_NOTIFY=3`` tells you kernel launch information.
 
 
 Data management across files

@@ -9,16 +9,16 @@ subroutines/functions in those sources files which use up the most time.
    - [x] meridional_flux_adjust            0.205482s **Edward**
    - [x] zonal_flux_adjust                 0.170399s **Edward**
    - [x] zonal_flux_layer                  0.095223s **Edward**
-   - [ ] set_merid_bt_cont                 0.080188s **Edward**
+   - [x] set_merid_bt_cont                 0.080188s **Edward**
    - [x] merid_flux_layer                  0.070164s **Edward**
-   - [ ] set_zonal_bt_cont                 0.060141s **Edward**
+   - [x] set_zonal_bt_cont                 0.060141s **Edward**
    - [ ] ppm_reconstruction_x              0.045106s
-   - [ ] zonal_mass_flux                   0.045106s
+   - [ ] zonal_mass_flux                   0.045106s **Edward**
    - [ ] ppm_reconstruction_y              0.040094s
-   - [ ] zonal_flux_thickness              0.040094s
-   - [ ] meridional_mass_flux              0.030070s
+   - [ ] zonal_flux_thickness              0.040094s **Edward**
+   - [ ] meridional_mass_flux              0.030070s **Edward**
    - [ ] ppm_limit_pos                     0.030070s
-   - [ ] meridional_flux_thickness         0.020047s
+   - [ ] meridional_flux_thickness         0.020047s **Edward**
    - [ ] meridional_edge_thickness         0.005012s
    - [ ] continuity_merdional_convergence  0.0s
    - [ ] continuity_ppm                    0.0s
@@ -170,3 +170,39 @@ sure what happens when multiple `target enter data` address the same data.
 
 * close to identical structure to `merid_flux_layer`
 * **Have yet to test whether the second loop (guarded by `if (local_open_BC) then`) was ported correctly**
+
+### set_merid_bt_cont
+
+* This calls `meridional_flux_adjust` and `merid_flux_layer`
+   * Input variables that are `intent(out)` in the child subroutine
+   needed to be `alloc`/`to` entirely, not just a section
+   * Had trouble with nested `enter target data` as subsequent entries were 
+   overwriting data on the device with outdated data on the host.
+* For some reason, I needed a `target update from(dvR, dvL)` statement in an
+innocuous spot to get correct results. I'm not sure why yet.
+
+### set_zonal_BT_cont
+
+* This call `zonal_flux_adjust` and `zonal_flux_layer`
+* Like `set_merid_bt_cont`, I had trouble with the `enter/exit/update`
+statements. 
+   * For some reason, `u` needed to be released before the final loop, but if I
+   move the release of `u` to the end with the rest of the releases, I get the
+   wrong results.
+
+### zonal_mass_flux
+
+* There's quite a few if statements guarding loops. I've left them un-ported as
+`double_gyre` doesn't use them. Tagged the sections with `not in double_gyre`
+comment.
+* `BT_cont` is a pointer, but including it in the final `exit data map(from:)`
+statement caused an error. Leaving it out and letting the compiler generate an
+implicit one seemed to work. The member arrays needed are explicitly specified.
+* This calls `zonal_flux_layer` and `set_zonal_BT_cont` quite a few times as the
+main loop iterates over `j` and calls those subroutines within the loop. 
+Mapping entire arrays with `enter/exit` reduced data transfers significantly.
+* I'm not sure what the logic is behind the compiler's decision, but I noticed
+that slicing multiple indices for rank 3+ arrays when transferring data will 
+result in many transfers being initiated. For rank3+ arrays, it seems like only
+the first index can be sliced in data transfer statements to reduce the number
+of transfers initiated. 
