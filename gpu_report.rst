@@ -437,6 +437,23 @@ loading.
   enddo ; enddo
   !$omp target update to(e(:,:,nz+1))
 
+However, be careful with arrays with rank 3 and above! Consider the below 
+declaration and subsequent data transfer:
+
+.. code:: fortran
+
+   real:: a(10, 20, 30)
+   
+   !$omp target enter data map(to: a(3:8, 3:18, :))
+   ... do work ...
+   !$omp target exit data map(from: a(3:8, 3:18, :))
+
+Both the ``enter`` and ``exit`` statements trigger ``(18-3+1)*30 = 480`` 
+transfers of ``4*(8-3+1) = 24`` bytes of data to/from the GPU! So, depending on
+the size/number of slices, it may be better to send more data than you need.
+For some reason, ``map(to: a(3:8, :, :))`` triggers only one transfer.
+
+I'm not sure of the exact reason why this happens!
 
 Data regions
 ------------
