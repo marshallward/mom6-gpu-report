@@ -170,13 +170,15 @@ I am currently using the following flags.
 
 .. code:: make
 
-   FCFLAGS += -mp=gpu -Mnofma -Minfo=all
+   FCFLAGS += -mp=gpu -Mnofma -Mno-factorize -Minfo=all
    LDFLAGS += -mp=gpu
 
 ``-mp=gpu`` enables GPU migration of OpenMP directives.  ``-Mnofma`` is used
 for reproducibility, since Nvidia compilers ignore parentheses when applying
-FMA instructions.  ``-Minfo`` is not required but is useful for monitoring GPU
-instructions, although it can be a bit overwhelming.
+FMA instructions. Similarly, ``-Mno-factorize`` ensures reprodicilibty by
+preventing the compiler from automatically factorizing sums in GPU kernels. 
+``-Minfo`` is not required but is useful for monitoring GPU instructions, 
+although it can be a bit overwhelming.
 
 Both compiler and linker require ``-mp=gpu``.  Internally, the flag is used to
 access CUDA libraries.
