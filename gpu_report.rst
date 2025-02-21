@@ -437,18 +437,18 @@ loading.
   enddo ; enddo
   !$omp target update to(e(:,:,nz+1))
 
-However, be careful with arrays with rank 3 and above! Consider the below 
+However, be careful with arrays with rank 3 and above! Consider the below
 declaration and subsequent data transfer:
 
 .. code:: fortran
 
    real:: a(10, 20, 30)
-   
+
    !$omp target enter data map(to: a(3:8, 3:18, :))
    ... do work ...
    !$omp target exit data map(from: a(3:8, 3:18, :))
 
-Both the ``enter`` and ``exit`` statements trigger ``(18-3+1)*30 = 480`` 
+Both the ``enter`` and ``exit`` statements trigger ``(18-3+1)*30 = 480``
 transfers of ``4*(8-3+1) = 24`` bytes of data to/from the GPU! So, depending on
 the size/number of slices, it may be better to send more data than you need.
 For some reason, ``map(to: a(3:8, :, :))`` triggers only one transfer.
@@ -507,7 +507,7 @@ monitor data transfers triggered by the OpenMP/OpenACC runtime e.g.
 terminal like:
 
 .. code::
-   
+
    upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
        threadid=1 variable=dt bytes=8
    upload CUDA data  file=<src-file> function=zonal_mass_flux line=617 device=0
@@ -529,25 +529,25 @@ happening in that subroutine:
    NV_ACC_NOTIFY=2 ../build/MOM6 2>&1 > mom6-dump.txt
    grep zonal_flux_layer | sort mom6-dump.txt | uniq -c | sort -n
 
-Which yields the number of transfers for a particular variable in ascending 
+Which yields the number of transfers for a particular variable in ascending
 order:
 
 .. code::
 
    ... a lot more lines
-    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer
           line=2061 device=0 threadid=1 variable=h_s(ish:ieh,j:j+1) bytes=704
-    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer
           line=2061 device=0 threadid=1 variable=por_face_areav(ish:ieh,j) bytes=352
-    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+    80356 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer
           line=2061 device=0 threadid=1 variable=visc_rem(ish:ieh) bytes=352
-   213036 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+   213036 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer
           line=2061 device=0 threadid=1 variable=.attach. bytes=200
-   213036 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer 
+   213036 upload CUDA data  file=/.../MOM_continuity_PPM.F90 function=merid_flux_layer
           line=2093 device=0 threadid=1 variable=.detach. bytes=8
 
 This information you can use to target variables to map in data regions or when
-using ``enter/exit`` statements. Additionally, you can `wc -l mom6-dump.txt` 
+using ``enter/exit`` statements. Additionally, you can `wc -l mom6-dump.txt`
 before and after to see whether your changes successfully reduced the number of
 transfers.
 
@@ -748,3 +748,48 @@ kernel.  Yet this is the example which chokes.
 Feedback and/or futher study is needed here.  (Maybe even just a read of the
 OpenMP standard?)
 
+
+Redundant target update
+-----------------------
+
+Certain loops on GPU currently fail to reproduce the CPU numbers unless
+redundant ``!$omp target update`` is appled.  For example, see
+``MOM_hor_visc.F90``.
+
+.. code:: fortran
+
+   !$omp target enter data map(to: u)
+   ! ...
+   do k = 1, n
+     !$omp target
+     !$omp parallel loop collapse(2)
+     do j=Jsq-1,Jeq+2 ; do i=Isq-1,Ieq+2
+       dudx(i,j) = CS%DY_dxT(i,j)*((G%IdyCu(I,j) * u(I,j,k)) - &
+                                   (G%IdyCu(I-1,j) * u(I-1,j,k)))
+     enddo ; enddo
+     !$omp end target
+   enddo
+
+Even though ``u`` has been updated to GPU, it appears to be using somewhat
+outdated values.  If an additional ``update`` directive is applied,
+
+.. code:: fortran
+
+   !$omp target enter data map(to: u)
+   ! ...
+   do k = 1, n
+     !$omp target update to(u(:,:,k))
+
+     !$omp target
+     !$omp parallel loop collapse(2)
+     do j=Jsq-1,Jeq+2 ; do i=Isq-1,Ieq+2
+       dudx(i,j) = CS%DY_dxT(i,j)*((G%IdyCu(I,j) * u(I,j,k)) - &
+                                   (G%IdyCu(I-1,j) * u(I-1,j,k)))
+     enddo ; enddo
+     !$omp end target
+   enddo
+
+then CPU-GPU equivalence is restored.
+
+There are other instances of this problem in the model (e.g. continuity
+solver).  Is this a compiler bug?  Or an error in the code directives?
