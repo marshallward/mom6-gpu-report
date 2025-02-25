@@ -13,12 +13,12 @@ subroutines/functions in those sources files which use up the most time.
    - [x] merid_flux_layer                  0.070164s **Edward**
    - [x] set_zonal_bt_cont                 0.060141s **Edward**
    - [ ] ppm_reconstruction_x              0.045106s
-   - [ ] zonal_mass_flux                   0.045106s **Edward**
+   - [x] zonal_mass_flux                   0.045106s **Edward**
    - [ ] ppm_reconstruction_y              0.040094s
-   - [ ] zonal_flux_thickness              0.040094s **Edward**
-   - [ ] meridional_mass_flux              0.030070s **Edward**
+   - [x] zonal_flux_thickness              0.040094s **Edward**
+   - [x] meridional_mass_flux              0.030070s **Edward**
    - [ ] ppm_limit_pos                     0.030070s
-   - [ ] meridional_flux_thickness         0.020047s **Edward**
+   - [x] meridional_flux_thickness         0.020047s **Edward**
    - [ ] meridional_edge_thickness         0.005012s
    - [ ] continuity_merdional_convergence  0.0s
    - [ ] continuity_ppm                    0.0s
@@ -179,7 +179,10 @@ sure what happens when multiple `target enter data` address the same data.
    * Had trouble with nested `enter target data` as subsequent entries were 
    overwriting data on the device with outdated data on the host.
 * For some reason, I needed a `target update from(dvR, dvL)` statement in an
-innocuous spot to get correct results. I'm not sure why yet.
+innocuous spot to get correct results.
+   * This turned out to be because of missing explicit mappings for a couple
+   variables, so the compiler was generating implicit `tofrom` for them. Adding
+   the correct explicit mappings resolved it.
 
 ### set_zonal_BT_cont
 
@@ -189,6 +192,8 @@ statements.
    * For some reason, `u` needed to be released before the final loop, but if I
    move the release of `u` to the end with the rest of the releases, I get the
    wrong results.
+      * This stopped being an issue after enter/exit data statements were added
+      in `zonal_mass_flux`, which calls this subroutine.
 
 ### zonal_mass_flux
 
@@ -198,6 +203,10 @@ comment.
 * `BT_cont` is a pointer, but including it in the final `exit data map(from:)`
 statement caused an error. Leaving it out and letting the compiler generate an
 implicit one seemed to work. The member arrays needed are explicitly specified.
+   * adding `BT_cont` as an `alloc` in the enter statement and `release` in the
+   exit statement prevented re-transerring `BT_cont`. I'm guessing `to` doesn't
+   work because it transers the pointer address, which points to the wrong place
+   on the GPU?
 * This calls `zonal_flux_layer` and `set_zonal_BT_cont` quite a few times as the
 main loop iterates over `j` and calls those subroutines within the loop. 
 Mapping entire arrays with `enter/exit` reduced data transfers significantly.
@@ -206,3 +215,16 @@ that slicing multiple indices for rank 3+ arrays when transferring data will
 result in many transfers being initiated. For rank3+ arrays, it seems like only
 the first index can be sliced in data transfer statements to reduce the number
 of transfers initiated. 
+
+### meridional_mass_flux
+
+Very similar to `zonal_mass_flux`.
+
+### zonal_flux_thickness and meridional_flux_thickness
+
+* These two consisted of two loops that were straightforward to port. There are
+loops in each that weren't ported as they weren't being used in `double_gyre`.
+* `enter/exit data` statements haven't been added as they were only being called
+by `zonal_mass_flux` and `meridional_mass_flux`, respectively and the
+`enter/exit data` statements in those subroutines mitigated the need for any
+transfers.
