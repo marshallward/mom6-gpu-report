@@ -12,18 +12,18 @@ subroutines/functions in those sources files which use up the most time.
    - [x] set_merid_bt_cont                 0.080188s **Edward**
    - [x] merid_flux_layer                  0.070164s **Edward**
    - [x] set_zonal_bt_cont                 0.060141s **Edward**
-   - [ ] ppm_reconstruction_x              0.045106s
+   - [ ] ppm_reconstruction_x              0.045106s **Edward**
    - [x] zonal_mass_flux                   0.045106s **Edward**
-   - [ ] ppm_reconstruction_y              0.040094s
+   - [ ] ppm_reconstruction_y              0.040094s **Edward**
    - [x] zonal_flux_thickness              0.040094s **Edward**
    - [x] meridional_mass_flux              0.030070s **Edward**
-   - [ ] ppm_limit_pos                     0.030070s
+   - [ ] ppm_limit_pos                     0.030070s **Edward**
    - [x] meridional_flux_thickness         0.020047s **Edward**
-   - [ ] meridional_edge_thickness         0.005012s
-   - [ ] continuity_merdional_convergence  0.0s
-   - [ ] continuity_ppm                    0.0s
-   - [ ] continuity_zonal_convergence      0.0s
-   - [ ] zonal_edge_thickness              0.0s
+   - [ ] meridional_edge_thickness         0.005012s **Edward**
+   - [ ] continuity_merdional_convergence  0.0s      **Edward**
+   - [ ] continuity_ppm                    0.0s      **Edward**
+   - [ ] continuity_zonal_convergence      0.0s      **Edward**
+   - [ ] zonal_edge_thickness              0.0s      **Edward**
 - [ ] MOM_barotropic.F90                   1.182772s
    - [ ] btstep                            1.002349s
    - [ ] set_local_bt_cont_types           0.080188s
