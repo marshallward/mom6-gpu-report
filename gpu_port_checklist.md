@@ -37,8 +37,8 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] vertvisc_remnant                  0.120282s
    - [ ] find_coupling_coef                0.075176s
    - [ ] vertvisc_limit_vel                0.035082s
-- [ ] MOM_hor_visc.F90                     0.200470s
-   - [ ] horizontal_viscosity              0.200470s
+- [ ] MOM_hor_visc.F90                     0.200470s **Edward**
+   - [ ] horizontal_viscosity              0.200470s **Edward**
 - [ ] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
    - [ ] coradcalc                         0.090211s **Marshall**
    - [ ] gradke                            0.035082s **Marshall**
