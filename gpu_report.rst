@@ -1,13 +1,48 @@
-===========================
-MOM6 GPU activities at GFDL
-===========================
+======================
+MOM6 GPU Porting Guide
+======================
 
 :author: Marshall Ward, Edward Yang
 :geometry: margin=3cm
 
 .. TODO: Cannot split author into a list?
 
-Summary of GPU-related activities around MOM6 at GFDL.
+This document describes the current state of porting MOM6 to GPU platforms.  We
+hope to provide essential context on the following questions.
+
+* Why should MOM6 be ported to GPUs?
+
+  * Will we always have access to this hardware?
+  * Could it become the *only* viable option for massively parallel jobs?
+  * Will we maintain support on CPU?  Could it become "legacy" hardware?
+
+* What are the available technologies?  How suitable is each technology for
+  MOM6?  Some issues to consider:
+
+  * Can it faithfully represent the MOM6 algorithms?
+  * Is the code maintainable?  Or even readable?
+  * Do we have explict control over the implementation?
+  * Does it depend on a particular software stack?  Is it a sprawling mess?
+  * Can we preserve the existing codebase?
+  * Is the new implementation bit-equivalent to the CPU result?
+
+We will try to address the questions above (over time, most likely).  For now,
+our conclusion is to preserve the existing codebase and introduce OpenMP
+directives.
+
+The latter part of this document is intended to be a "how-to" for new users.
+We hope to include the following:
+
+* Instructions for compiling models with GPU support.  We currently focus on
+  Nvidia, but should consider other platforms (AMD, possibly Intel?).
+
+* Tutorial for using OpenMP for GPU migration, with a focus on MOM6.
+
+* Relative performance of different strategies.
+
+This is a work in progress.  Not every section is well-structured or even in a
+readable form.  At this early stage, our goal is to accumulate information.  In
+other words, please excuse the mess.
 
 
 Motivation
