@@ -797,3 +797,116 @@ then CPU-GPU equivalence is restored.
 
 There are other instances of this problem in the model (e.g. continuity
 solver).  Is this a compiler bug?  Or an error in the code directives?
+
+
+Nested and cross-subroutine parallelism
+---------------------------------------
+
+In MOM6, it's not uncommon to have large 3D loops written such that the
+outer-most loop encompass many nested inner-loops, where outer loop
+iterations are independent. A hopefully easy-to-read example of this 
+is in `horizontal_viscosity`_, which also `calls subroutines`_
+that perform the inner loops. You may not want to refactor, so instead
+you could try leverage nested parallelism.
+
+.. _horizontal_viscosity: https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/parameterizations/lateral/MOM_hor_visc.F90#L702
+.. _calls subroutines: https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/parameterizations/lateral/MOM_hor_visc.F90#L1085
+
+For the case were the outer loops contain **multiple independent** inner 
+loops, you can distribute the outer loop across OpenMP target teams. The
+inner loops can then be parallelised within each team. Below is a 
+contrived example:
+
+.. code:: fortran
+
+   !$omp target teams distribute private(x, y) map(from: z)
+   do k = 1, nz
+
+      !$omp parallel do simd collapse(2)
+      do j = 1, nj
+         do i = 1, ni
+            x(i, j) = ...
+            y(i, j) = ...
+         enddo
+      enddo
+
+      ... maybe more similar loops ...
+
+      !$omp parallel do simd collapse(2)
+      do j = 1, nj
+         do i = 1, ni
+            z(i, j, k) = x(i, j) + y(i, j)
+         enddo
+      enddo
+   enddo ! end of k-loop
+
+
+The first directive creates a private copy of :code:`x` and :code:`y` in each team.
+If the array size isn't known at compile time, :code:`nvfortran` seems to assume
+that the private array is small, and will try to allocate space on
+shared memory (memory visible within the team, and faster than global).
+
+If the inner loops are in another subroutine, the :code:`!$omp declare target`
+subroutine can be utilized:
+
+.. code:: fortran
+
+   subroutine do_something(ni, nj, in_array, out_array)
+      implicit none
+      integer, intent(in):: ni, nj
+      real, intent(in):: in_array(ni, nj)
+      real, intent(out):: out_array(ni, nj)
+      real:: tmp_array(ni, nj)
+      integer:: i, j
+
+      ! tell the compiler that the subroutine will be called in a
+      ! target region.
+      !$omp declare target
+
+      ! put parallel do inside
+      ! nb I run into errors when using collapse inside
+      !$omp parallel do simd
+      do j = 1, nj
+         do i = 1, ni
+            tmp_array(i, j) = ...
+         enddo
+      enddo
+
+      !$omp parallel do simd
+      do j = 1, nj
+         do i = 1, ni
+            out_array(i, j) = ...
+         enddo
+      enddo
+
+   end subroutine do_something
+
+   ! ... in the main loop
+   !$omp teams distribute ...
+   do k = 1, nz
+      !$omp parallel do simd collapse(2)
+      do j = 1, nj
+         do i = 1, ni
+            ! ... do something ...
+         enddo
+      enddo
+
+      call do_something(...)
+   enddo
+
+
+Problems with nested parallelism
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Shared memory is limited on GPUs (24-48kB for NVIDIA), so if you have 10 teams,
+  that leaves 2.4-4.8kB per team. Exceeding shared memory will degrade performance
+  as arrays go into global memory.
+* GPU static memory is limited, so if you jump into a subroutine that allocates
+  lots of static arrays, it doesn't take much to OOM (see relevant `NVIDIA forum post`_).
+* Jumping into a target subroutine segfaults when an argument is a pointer.
+* I get incorrect results when the :code:`parallel do` inside a target subroutine is
+  coupled with :code:`collapse()`.
+* I've found that explicit nested parallelism performs meaningfully worse than
+  refactoring the loops into separate :code:`kji` blocks.
+
+.. _NVIDIA forum post: https://forums.developer.nvidia.com/t/issue-with-automatic-array-in-device-subroutine-defined-with-openacc-directive/245873/2
