@@ -745,6 +745,73 @@ There is also no guarantee that this will work in other compilers.
 Compiler support
 ----------------
 
+NVHPC Optimization parser problems?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If I do an ``-O2`` CPU build with 24.5, then something strange happens with the
+parser.::
+
+   FATAL: MOM_file_parser : the parameter name 'DT' was found without define or undef. Line: 'DT =' in file MOM_input.
+
+The file parser sets the last character (``last``) to 4, even though it's
+looking for ``" = "``.  If I change the search to ``=``, then I get a new
+error::
+
+   FATAL: read_param_real: Variable DT found but not set in input files.
+
+Oddly, none of this happens in the GPU build, even though there are no GPU
+structures in the file.
+
+Not sure what's going on, but it's preventing ``-O2`` comparisons between CPU
+and GPU.
+
+(This could be fixed in 24.9 or 25.x, needs testing)
+
+
+OpenMP handler problems
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The OpenMP-based version of ``set_pbce_Bouss`` chokes on newer compilers (24.9,
+25.1).  It works with 24.5.  This is a compile-time error, not runtime.
+
+The problem doesn't appear to be with any particular loop.  Nor does it
+necessarily be caused by the ``target data`` regions.  However, it is one of
+the few regions using ``target data``, so it could be related.
+
+Still looking into this one.
+
+
+NVHPC 25.1 flag mismatch
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+nvhpc 25.1 struggles with certain flag combinations on certain files.
+
+If I use ``nvfortran -O2 -O0`` on FMS ``diag_data.F90``, then I see an error::
+
+   $ nvfortran -c -O2 -O0 test.f90
+   nvfortran-Info-Switch -Mvect forces -O2
+   NVFORTRAN-F-0000-Internal compiler error. Deferred-length character symbol must have descriptor     730  (test.f90: 27)
+   NVFORTRAN/x86-64 Linux 25.1-0: compilation aborted
+
+It seems to come from the ``-Mvect`` flag::
+
+   $ nvfortran -c -Mvect test.f90
+   NVFORTRAN-F-0000-Internal compiler error. Deferred-length character symbol must have descriptor     730  (test.f90: 27)
+   NVFORTRAN/x86-64 Linux 25.1-0: compilation aborted
+
+Apparently it's some config problem on their end.  This seems to magically
+fix the problem::
+
+   $ nvfortran -c -O2 -O0 -Hx,53,2 test.f90
+   nvfortran-Info-Switch -Mvect forces -O2
+
+This was discovered because ``mpifort`` always used ``-O2`` on one of our
+machines.
+
+
+GCC issues
+~~~~~~~~~~
+
 OpenMP offloading to target GPUs is a relatively new feature.  This was
 introduced in OpenMP 4.0, and didn't quite catch up to OpenACC until 5.x.
 
@@ -762,6 +829,9 @@ Allocatables in derived types were added in 5.0 and is still not supported in
 GCC 14.
 
 https://gcc.gnu.org/onlinedocs/gcc-13.1.0/libgomp/OpenMP-5_002e0.html
+
+
+
 
 
 Loop dependencies within a kernel
