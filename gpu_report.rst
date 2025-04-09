@@ -334,8 +334,7 @@ The ``simd`` directs the team to use SIMD-like instructions over the threads.
 This is almost always the default behavior, so it is often omitted.
 
 Note that as of `9th April, 2025` AMD compilers don't understand the `loop`
-directive. So, for portability, it is probably preferable to use the less-concise
-`!$omp teams distribute parallel do simd ...` directive.
+directive.
 
 
 Data Migration
