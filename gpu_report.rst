@@ -3,7 +3,6 @@ MOM6 GPU activities at GFDL
 ===========================
 
 :author: Marshall Ward
-:organization: NOAA-GFDL
 :geometry: margin=3cm
 
 Summary of GPU-related activities around MOM6 at GFDL.
@@ -173,15 +172,48 @@ I am currently using the following flags.
    FCFLAGS += -mp=gpu -Mnofma -Minfo=all
    LDFLAGS += -mp=gpu
 
-``-mp=gpu`` enables GPU migration of OpenMP directives.  ``-Mnofma`` is used
-for reproducibility, since Nvidia compilers ignore parentheses when applying
-FMA instructions.  ``-Minfo`` is not required but is useful for monitoring GPU
-instructions, although it can be a bit overwhelming.
+``-mp=gpu``
+   This instructs the compiler to convert OpenMP directives to GPU bytecode.
 
-Both compiler and linker require ``-mp=gpu``.  Internally, the flag is used to
-access CUDA libraries.
+  Both compiler and linker require ``-mp=gpu``.  Internally, the flag is used to
+  access CUDA libraries.
+
+``-Mnofma``
+   This disables FMAs in the bytecode output, in both CPU and GPU.
+
+   MOM6 provides parentheses to disable FMAs in critical regions, allowing us
+   to safely use them where appropriate.  This appears to be respected in the
+   CPU output, but the GPU output does not seem to respect parentheses when
+   producing FMA output, and we see answer changes.
+
+   Until this is fixed on the compiler side, we much for now disable FMAs.
+
+``-Minfo=all``
+   Ths is not necessary, but provides interesting (if overwhelming) updates on
+   GPU usage.
 
 .. TODO: Error for missing LDFLAGS?
+
+
+``do concurrent`` Support
+-------------------------
+
+``-stdpar=gpu``
+   Migrate ``do concurrent`` loops to GPU.
+
+   This appears to generate an independent kernel for the loop, which is run on
+   the GPU.  Managed memory is the default configuration, but this appears to
+   run extremely slow for us.  When using do-concurrent, we want to disable
+   managed memory.
+
+``-gpu=nomanaged``
+   Disable managed memory and explicitly move arrays.
+
+   Despite being a major burden for the developer, this has so far proven to be
+   the best option for us.
+
+   We should continue to explore the viability of managed or unified memory,
+   but so far the timings of managed memory have been over 5x slower.
 
 
 Non-Nvidia devices and Compilers
