@@ -2,8 +2,10 @@
 MOM6 GPU activities at GFDL
 ===========================
 
-:author: Marshall Ward
+:author: Marshall Ward, Edward Yang
 :geometry: margin=3cm
+
+.. TODO: Cannot split author into a list?
 
 Summary of GPU-related activities around MOM6 at GFDL.
 
