@@ -811,7 +811,7 @@ you could try leverage nested parallelism.
 .. _horizontal_viscosity: https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/parameterizations/lateral/MOM_hor_visc.F90#L702
 .. _calls subroutines: https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/parameterizations/lateral/MOM_hor_visc.F90#L1085
 
-For the case were the outer loops contain **multiple independent** inner 
+For the case where the outer loops contain **multiple independent** inner 
 loops, you can distribute the outer loop across OpenMP target teams. The
 inner loops can then be parallelised within each team. Below is a 
 contrived example:
