@@ -5,25 +5,25 @@ Below are a list of subroutines/functions that are used in the `double_gyre`
 test - sorted first by source files which use up the most CPU time, then by the
 subroutines/functions in those sources files which use up the most time.
 
-- [ ] MOM_continuity_PPM.F90               1.207831s **Edward**
+- [x] MOM_continuity_PPM.F90               1.207831s **Edward** [**first draft**](https://github.com/edoyango/MOM6/tree/fuse-loops-gpu-port)
    - [x] meridional_flux_adjust            0.205482s **Edward**
    - [x] zonal_flux_adjust                 0.170399s **Edward**
    - [x] zonal_flux_layer                  0.095223s **Edward**
    - [x] set_merid_bt_cont                 0.080188s **Edward**
    - [x] merid_flux_layer                  0.070164s **Edward**
    - [x] set_zonal_bt_cont                 0.060141s **Edward**
-   - [ ] ppm_reconstruction_x              0.045106s **Edward**
+   - [x] ppm_reconstruction_x              0.045106s **Edward**
    - [x] zonal_mass_flux                   0.045106s **Edward**
-   - [ ] ppm_reconstruction_y              0.040094s **Edward**
+   - [x] ppm_reconstruction_y              0.040094s **Edward**
    - [x] zonal_flux_thickness              0.040094s **Edward**
    - [x] meridional_mass_flux              0.030070s **Edward**
-   - [ ] ppm_limit_pos                     0.030070s **Edward**
+   - [x] ppm_limit_pos                     0.030070s **Edward**
    - [x] meridional_flux_thickness         0.020047s **Edward**
-   - [ ] meridional_edge_thickness         0.005012s **Edward**
-   - [ ] continuity_merdional_convergence  0.0s      **Edward**
-   - [ ] continuity_ppm                    0.0s      **Edward**
-   - [ ] continuity_zonal_convergence      0.0s      **Edward**
-   - [ ] zonal_edge_thickness              0.0s      **Edward**
+   - [x] meridional_edge_thickness         0.005012s **Edward**
+   - [x] continuity_merdional_convergence  0.0s      **Edward**
+   - [x] continuity_ppm                    0.0s      **Edward**
+   - [x] continuity_zonal_convergence      0.0s      **Edward**
+   - [x] zonal_edge_thickness              0.0s      **Edward**
 - [ ] MOM_barotropic.F90                   1.182772s
    - [ ] btstep                            1.002349s
    - [ ] set_local_bt_cont_types           0.080188s
@@ -37,8 +37,8 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] vertvisc_remnant                  0.120282s
    - [ ] find_coupling_coef                0.075176s
    - [ ] vertvisc_limit_vel                0.035082s
-- [ ] MOM_hor_visc.F90                     0.200470s
-   - [ ] horizontal_viscosity              0.200470s
+- [ ] MOM_hor_visc.F90                     0.200470s **Marshall**
+   - [ ] horizontal_viscosity              0.200470s **Marshall**
 - [ ] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
    - [ ] coradcalc                         0.090211s **Marshall**
    - [ ] gradke                            0.035082s **Marshall**
@@ -46,7 +46,7 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] send_data_3d                      0.070164s
 - [ ] MOM_set_viscosity.F90                0.055129s
    - [ ] set_viscous_bbl                   0.055129s
-- [ ] MOM_dynamics_split_RL2.F90           0.035082s
+- [ ] MOM_dynamics_split_RK2.F90           0.035082s
    - [ ] step_mom_dyn_split_rk2            0.030070s
    - [ ] register_restarts_dyn_split_rk2   0.005012s
 - [ ] MOM_PressureForce_FV.F90             0.025059s **Marshall**
@@ -100,6 +100,41 @@ vtune \
 ```
 
 ## `MOM_continuity_PPM.F90`
+
+### Loop refactoring
+
+It was discovered that porting loops as they were was causing performance degredation.
+This was because long 3D loops were written such that the outer-most loop was initiated
+in one subroutine, and the inner loops were called in another subroutine, perhaps one
+or two subroutines deep. Adding OpenMP target directives on the inner-most loop caused
+significant slow down due to latency in kernel launches. A prime example of this
+problem is [`merid_flux_layer`](https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/core/MOM_continuity_PPM.F90#L1787), 
+which is called by [`meridional_flux_adjust`](https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/core/MOM_continuity_PPM.F90#L1995) in a
+k-loop, which is in-turn called in a newton iterative loop. This subroutine is then
+called in a `j` outer loop in [`meridional_mass_flux](https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/core/MOM_continuity_PPM.F90#L1413).
+So, if the loops in `merid_flux_layer` are ported, that GPU kernel would be 
+called `nk*nj*niter*ntimesteps` times (where `nk/j` is number of `k/j` iterations, and 
+`niter` is an average number of newton iteratios). In `double_gyre`, this amounts to 
+roughly `2*40*3*1240 ~ 3e6` calls, where each call takes ~40μs (~30μs compute + 10μs launch
+latency), which is ~12s in total (the entire `double_gyre` CPU-only case takes about 10s). 
+Note that `meridional_flux_adjust` is called in [another place](https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/core/MOM_continuity_PPM.F90#L2223C3-L2225C60), 
+and `meridional_flux_adjust` is called in a [few](https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/core/MOM_continuity_PPM.F90#L1768)
+[other](https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/core/MOM_continuity_PPM.F90#L2265) 
+places (separate from `meridional_flux_adjust`). Furthermore, `zonal_flux_layer`
+follows a similar pattern and does a similar amount of work.
+
+Refactoring the loops such that they occur in blocks of 3D loops improved mitigated
+this significantly as number of kernel launches can be made `O(ntimesteps*niter)`. The
+kernels themselves also have more parallelism for the GPU to exploit. 
+
+However, writing loops in this way mean that the iterative loop in 
+`zonal/meridional_flux_adjust` has to occur on the entire grid together, rather than
+on a per-row basis like in the original code. This means more work is being done.
+In `double_gyre`, this extra work is roughly 30% as the original code stops
+iterating on rows where all elements have converged.
+
+This all results in a significant speedup on the GPU, but a meaningful slowdown on the
+CPU (1.3-1.5x slower).
 
 ### `meridional_flux_adjust`
 
