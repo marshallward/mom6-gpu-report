@@ -840,12 +840,12 @@ contrived example:
    enddo ! end of k-loop
 
 
-The first directive creates a private copy of :code:`x` and :code:`y` in each team.
-If the array size isn't known at compile time, :code:`nvfortran` seems to assume
+The first directive creates a private copy of ``x`` and ``y`` in each team.
+If the array size isn't known at compile time, ``nvfortran`` seems to assume
 that the private array is small, and will try to allocate space on
 shared memory (memory visible within the team, and faster than global).
 
-If the inner loops are in another subroutine, the :code:`!$omp declare target`
+If the inner loops are in another subroutine, the ``!$omp declare target``
 subroutine can be utilized:
 
 .. code:: fortran
@@ -897,15 +897,14 @@ subroutine can be utilized:
 Problems with nested parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Shared memory is limited on GPUs (24-48kB for NVIDIA), so if you have 10 teams,
-  that leaves 2.4-4.8kB per team. Exceeding shared memory will degrade performance
-  as arrays go into global memory.
+* Shared memory is limited on GPUs (24-48kB per block/team for NVIDIA). 
+  Exceeding shared memory will degrade performance as arrays go into global memory.
 * GPU static memory is limited, so if you jump into a subroutine that allocates
   lots of static arrays, it doesn't take much to OOM (see relevant `NVIDIA forum post`_).
 * Jumping into a target subroutine segfaults when an argument is a pointer.
-* I get incorrect results when the :code:`parallel do` inside a target subroutine is
-  coupled with :code:`collapse()`.
+* I get incorrect results when the ``parallel do`` inside a target subroutine is
+  coupled with ``collapse()``.
 * I've found that explicit nested parallelism performs meaningfully worse than
-  refactoring the loops into separate :code:`kji` blocks.
+  refactoring the loops into separate ``kji`` blocks.
 
 .. _NVIDIA forum post: https://forums.developer.nvidia.com/t/issue-with-automatic-array-in-device-subroutine-defined-with-openacc-directive/245873/2
