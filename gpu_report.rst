@@ -579,7 +579,7 @@ and ``use_device_ptr`` or ``use_device_addr``. Doing so should allow for direct
 GPU to GPU data transfers, assuming the MPI library was built with relevant GPU
 support. See `working example from AMD`_.
 
-.. working example from AMD: https://github.com/FluidNumerics/gpu-programming/blob/main/samples/fortran/mpi%2Bopenmp/main.f90
+.. _working example from AMD: https://github.com/FluidNumerics/gpu-programming/blob/main/samples/fortran/mpi%2Bopenmp/main.f90
 
 .. code:: fortran
 
