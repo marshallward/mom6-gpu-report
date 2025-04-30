@@ -244,7 +244,8 @@ I am currently using the following flags.
    managed memory.
 
 ``-gpu=nomanaged``
-   Disable managed memory and explicitly move arrays.
+   Disable managed memory and explicitly move arrays. Recent versions of NVHPC
+   will prefer ``-gpu=mem:separate``.
 
    Despite being a major burden for the developer, this has so far proven to be
    the best option for us.
@@ -568,6 +569,29 @@ the ``!$omp target`` directive.
 
 but for more complex blocks with multiple kernels, it can be a valuable way to
 define the scope of a variable.  (TODO: Show a more complex example.)
+
+
+OpenMP Targets and MPI (WIP!)
+-----------------------------
+
+OpenMP should support passing data on device to MPI calls by using data regions
+and ``use_device_ptr`` or ``use_device_addr``. Doing so should allow for direct
+GPU to GPU data transfers, assuming the MPI library was built with relevant GPU
+support. See `working example from AMD`_.
+
+.. _working example from AMD: https://github.com/FluidNumerics/gpu-programming/blob/main/samples/fortran/mpi%2Bopenmp/main.f90
+
+.. code:: fortran
+
+   ! make sure data is initalized on device
+   !$omp target enter data map(to: a)
+   ! ... do stuff ...
+   ! initialize new data region, and make sure device data is used
+   !$omp target data use_device_ptr(a) ! newer compilers might prefer use_device_addr
+   if (rank == 0) call MPI_Send(a, ...)
+   if (rank == 1) call MPI_Recv(a, ...)
+   !$omp end target data
+   !$omp target exit data map(from: a)
 
 
 Pseudo-profiling for tracking data transfers
