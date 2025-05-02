@@ -244,7 +244,8 @@ I am currently using the following flags.
    managed memory.
 
 ``-gpu=nomanaged``
-   Disable managed memory and explicitly move arrays.
+   Disable managed memory and explicitly move arrays. Recent versions of NVHPC
+   will prefer ``-gpu=mem:separate``.
 
    Despite being a major burden for the developer, this has so far proven to be
    the best option for us.
@@ -401,6 +402,9 @@ A possibly faster form of the previous loop is shown below.
 
 The ``simd`` directs the team to use SIMD-like instructions over the threads.
 This is almost always the default behavior, so it is often omitted.
+
+Note that as of `9th April, 2025` AMD compilers don't understand the `loop`
+directive.
 
 
 Data Migration
@@ -567,6 +571,29 @@ but for more complex blocks with multiple kernels, it can be a valuable way to
 define the scope of a variable.  (TODO: Show a more complex example.)
 
 
+OpenMP Targets and MPI (WIP!)
+-----------------------------
+
+OpenMP should support passing data on device to MPI calls by using data regions
+and ``use_device_ptr`` or ``use_device_addr``. Doing so should allow for direct
+GPU to GPU data transfers, assuming the MPI library was built with relevant GPU
+support. See `working example from AMD`_.
+
+.. _working example from AMD: https://github.com/FluidNumerics/gpu-programming/blob/main/samples/fortran/mpi%2Bopenmp/main.f90
+
+.. code:: fortran
+
+   ! make sure data is initalized on device
+   !$omp target enter data map(to: a)
+   ! ... do stuff ...
+   ! initialize new data region, and make sure device data is used
+   !$omp target data use_device_ptr(a) ! newer compilers might prefer use_device_addr
+   if (rank == 0) call MPI_Send(a, ...)
+   if (rank == 1) call MPI_Recv(a, ...)
+   !$omp end target data
+   !$omp target exit data map(from: a)
+
+
 Pseudo-profiling for tracking data transfers
 --------------------------------------------
 
@@ -574,10 +601,15 @@ Pseudo-profiling for tracking data transfers
 monitor data transfers triggered by the OpenMP/OpenACC runtime.
 
 Settings are configured by bitmasked values.
+
 * 1: kernel launches
+
 * 2: data transfers
+
 * 4: wait operations or synchronizations with the device
+
 * 8: region entry/exit
+
 * 16: data allocate/free
 
 For example, ``NV_ACC_NOTIFY=2 ../build/MOM6`` will dump a bunch of information
@@ -940,3 +972,115 @@ then CPU-GPU equivalence is restored.
 
 There are other instances of this problem in the model (e.g. continuity
 solver).  Is this a compiler bug?  Or an error in the code directives?
+
+
+Nested and cross-subroutine parallelism
+---------------------------------------
+
+In MOM6, it's not uncommon to have large 3D loops written such that the
+outer-most loop encompass many nested inner-loops, where outer loop
+iterations are independent. A hopefully easy-to-read example of this 
+is in `horizontal_viscosity`_, which also `calls subroutines`_
+that perform the inner loops. You may not want to refactor, so instead
+you could try leverage nested parallelism.
+
+.. _horizontal_viscosity: https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/parameterizations/lateral/MOM_hor_visc.F90#L702
+.. _calls subroutines: https://github.com/NOAA-GFDL/MOM6/blob/e818ea4e792f0b85797247f955789b3c1210db8d/src/parameterizations/lateral/MOM_hor_visc.F90#L1085
+
+For the case where the outer loops contain **multiple independent** inner 
+loops, you can distribute the outer loop across OpenMP target teams. The
+inner loops can then be parallelised within each team. Below is a 
+contrived example:
+
+.. code:: fortran
+
+   !$omp target teams distribute private(x, y) map(from: z)
+   do k = 1, nz
+
+      !$omp parallel do simd collapse(2)
+      do j = 1, nj
+         do i = 1, ni
+            x(i, j) = ...
+            y(i, j) = ...
+         enddo
+      enddo
+
+      ... maybe more similar loops ...
+
+      !$omp parallel do simd collapse(2)
+      do j = 1, nj
+         do i = 1, ni
+            z(i, j, k) = x(i, j) + y(i, j)
+         enddo
+      enddo
+   enddo ! end of k-loop
+
+
+The first directive creates a private copy of ``x`` and ``y`` in each team.
+If the array size isn't known at compile time, ``nvfortran`` seems to assume
+that the private array is small, and will try to allocate space on
+shared memory (memory visible within the team, and faster than global).
+
+If the inner loops are in another subroutine, the ``!$omp declare target``
+subroutine can be utilized:
+
+.. code:: fortran
+
+   subroutine do_something(ni, nj, in_array, out_array)
+      implicit none
+      integer, intent(in):: ni, nj
+      real, intent(in):: in_array(ni, nj)
+      real, intent(out):: out_array(ni, nj)
+      real:: tmp_array(ni, nj)
+      integer:: i, j
+
+      ! tell the compiler that the subroutine will be called in a
+      ! target region.
+      !$omp declare target
+
+      ! put parallel do inside
+      ! nb I run into errors when using collapse inside
+      !$omp parallel do simd
+      do j = 1, nj
+         do i = 1, ni
+            tmp_array(i, j) = ...
+         enddo
+      enddo
+
+      !$omp parallel do simd
+      do j = 1, nj
+         do i = 1, ni
+            out_array(i, j) = ...
+         enddo
+      enddo
+
+   end subroutine do_something
+
+   ! ... in the main loop
+   !$omp teams distribute ...
+   do k = 1, nz
+      !$omp parallel do simd collapse(2)
+      do j = 1, nj
+         do i = 1, ni
+            ! ... do something ...
+         enddo
+      enddo
+
+      call do_something(...)
+   enddo
+
+
+Problems with nested parallelism
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Shared memory is limited on GPUs (24-48kB per block/team for NVIDIA). 
+  Exceeding shared memory will degrade performance as arrays go into global memory.
+* GPU static memory is limited, so if you jump into a subroutine that allocates
+  lots of static arrays, it doesn't take much to OOM (see relevant `NVIDIA forum post`_).
+* Jumping into a target subroutine segfaults when an argument is a pointer.
+* I get incorrect results when the ``parallel do`` inside a target subroutine is
+  coupled with ``collapse()``.
+* I've found that explicit nested parallelism performs meaningfully worse than
+  refactoring the loops into separate ``kji`` blocks.
+
+.. _NVIDIA forum post: https://forums.developer.nvidia.com/t/issue-with-automatic-array-in-device-subroutine-defined-with-openacc-directive/245873/2
