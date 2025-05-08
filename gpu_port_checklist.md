@@ -31,12 +31,12 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] find_vhbt                         0.040094s
    - [ ] bt_mass_source                    0.010023s
    - [ ] btcalc                            0.010023s
-- [ ] MOM_vert_friction.F90                0.726703s
-   - [ ] vertvisc_coef                     0.355834s
-   - [ ] vertvisc                          0.140329s
-   - [ ] vertvisc_remnant                  0.120282s
-   - [ ] find_coupling_coef                0.075176s
-   - [ ] vertvisc_limit_vel                0.035082s
+- [ ] MOM_vert_friction.F90                0.726703s **Edward**
+   - [ ] vertvisc_coef                     0.355834s **Edward**
+   - [ ] vertvisc                          0.140329s **Edward**
+   - [ ] vertvisc_remnant                  0.120282s **Edward**
+   - [ ] find_coupling_coef                0.075176s **Edward**
+   - [ ] vertvisc_limit_vel                0.035082s **Edward**
 - [ ] MOM_hor_visc.F90                     0.200470s **Marshall**
    - [ ] horizontal_viscosity              0.200470s **Marshall**
 - [ ] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
