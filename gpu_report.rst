@@ -597,10 +597,23 @@ support. See `working example from AMD`_.
 Pseudo-profiling for tracking data transfers
 --------------------------------------------
 
-NVIDIA compilers have an undocumented environment variable that you can set to
-monitor data transfers triggered by the OpenMP/OpenACC runtime e.g.
-``NV_ACC_NOTIFY=2 ../build/MOM6`` will dump a bunch of information to your
-terminal like:
+``NV_ACC_NOTIFY`` is an undocumented environment variable that you can set to
+monitor data transfers triggered by the OpenMP/OpenACC runtime.
+
+Settings are configured by bitmasked values.
+
+* 1: kernel launches
+
+* 2: data transfers
+
+* 4: wait operations or synchronizations with the device
+
+* 8: region entry/exit
+
+* 16: data allocate/free
+
+For example, ``NV_ACC_NOTIFY=2 ../build/MOM6`` will dump a bunch of information
+to your terminal like:
 
 .. code::
 
