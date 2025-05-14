@@ -276,7 +276,7 @@ repository includes a Makefile for building the executable.
    $ cd MOM6-examples/ocean_only
    $ CC=nvcc \
      FC=nvfortran \
-     FCFLAGS="-g -O0 -mp=gpu -Mnofma -Minfo=all" \
+     FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all" \
      LDFLAGS="-mp=gpu" \
      make -j
 
@@ -420,17 +420,23 @@ To move an array from host to device, or vice versa::
 
    !$omp target enter data map(to: x)
 
-This allocates a new ``x`` on the GPU and sets the values from the CPU.  **It
-will overwrite an existing x!**
+This allocates a new ``x`` on the GPU and sets the values from the CPU. If ``x``
+has been mapped to the GPU previously (either through ``map(to: ...)`` or
+``map(from: ...)``), then this increments the reference counter to ``x`` by 1,
+but leaves ``x`` unchanged (see `OpenMP 5.0 API Spec`_ pg 318 line 18 to pg 
+319 line 9).
 
 To move data from GPU back to CPU::
 
    !$omp target exit data map(from: x)
 
-**This will also deallocate x on the GPU.**
+This decrements the reference counter to ``x`` by 1, and **only transfers data
+back to the CPU if the reference counter hits 0** (`OpenMP 5.0 API Spec`_ pg
+319 line 18 to line 19).
 
 Arrays can be independently allocated or deleted on the GPU.  This block
-allocates ``h`` on the GPU but does not fill its data.
+allocates ``h`` on the GPU but does not fill its data. If ``h`` is already
+present, the reference counter is incremented.
 
 .. code:: fortran
 
@@ -438,12 +444,20 @@ allocates ``h`` on the GPU but does not fill its data.
    CS%h(:,:,:) = GV%Angstrom_H
    !$omp target enter data map(alloc: CS%h)
 
-This block deallocates ``h`` on the GPU.
+This block sets the reference counter of ``h`` to zero and deallocates ``h``
+on the GPU (`OpenMP 5.0 API Spec`_ pg 319 lines 27-28).
 
 .. code:: fortran
 
-   deallocate(CS%h)
    !$omp target exit data map(delete: h)
+
+This block decrements ``h`` reference counter by 1. If the reference counter
+hits zero, then ``h`` is also deallocated on the GPU (`OpenMP 5.0 API Spec`_
+pg 319 lines 24-26).
+
+.. code:: fortran
+
+    !$omp target exit data map(release: h)
 
 If you want to exchange values between a array which already exists on the GPU,
 use ``update``.
@@ -462,6 +476,8 @@ The ``to`` and ``from`` modifiers are with respect to the target GPU.
    modifier.  In Nvidia, the runtime appears to handle this well and avoids
    redundant transfers, so it is probably not necessary to use ``present()``.
    But this is still something that should be monitored closely.
+
+.. _OpenMP 5.0 API Spec: https://www.openmp.org/wp-content/uploads/OpenMP-API-Specification-5.0.pdf
 
 
 Scalar data transfer

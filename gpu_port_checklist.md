@@ -31,26 +31,26 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] find_vhbt                         0.040094s
    - [ ] bt_mass_source                    0.010023s
    - [ ] btcalc                            0.010023s
-- [ ] MOM_vert_friction.F90                0.726703s
-   - [ ] vertvisc_coef                     0.355834s
-   - [ ] vertvisc                          0.140329s
-   - [ ] vertvisc_remnant                  0.120282s
-   - [ ] find_coupling_coef                0.075176s
-   - [ ] vertvisc_limit_vel                0.035082s
-- [ ] MOM_hor_visc.F90                     0.200470s **Marshall**
-   - [ ] horizontal_viscosity              0.200470s **Marshall**
-- [ ] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
-   - [ ] coradcalc                         0.090211s **Marshall**
-   - [ ] gradke                            0.035082s **Marshall**
+- [x] MOM_vert_friction.F90                0.726703s **Edward** [**draft**](https://github.com/edoyango/MOM6/tree/vertvisc-gpu)
+   - [x] vertvisc_coef                     0.355834s **Edward**
+   - [x] vertvisc                          0.140329s **Edward**
+   - [x] vertvisc_remnant                  0.120282s **Edward**
+   - [x] find_coupling_coef                0.075176s **Edward**
+   - [x] vertvisc_limit_vel                0.035082s **Edward**
+- [x] MOM_hor_visc.F90                     0.200470s **Marshall**
+   - [x] horizontal_viscosity              0.200470s **Marshall**
+- [x] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
+   - [x] coradcalc                         0.090211s **Marshall**
+   - [x] gradke                            0.035082s **Marshall**
 - [ ] diag_manager.F90                     0.070164s
    - [ ] send_data_3d                      0.070164s
 - [ ] MOM_set_viscosity.F90                0.055129s
    - [ ] set_viscous_bbl                   0.055129s
-- [ ] MOM_dynamics_split_RK2.F90           0.035082s
-   - [ ] step_mom_dyn_split_rk2            0.030070s
-   - [ ] register_restarts_dyn_split_rk2   0.005012s
-- [ ] MOM_PressureForce_FV.F90             0.025059s **Marshall**
-   - [ ] pressureforce_fv_bouss            0.025059s **Marshall**
+- [ ] MOM_dynamics_split_RK2.F90           0.035082s **Marshall**
+   - [ ] step_mom_dyn_split_rk2            0.030070s **Marshall**
+   - [ ] register_restarts_dyn_split_rk2   0.005012s **Marshall**
+- [x] MOM_PressureForce_FV.F90             0.025059s **Marshall**
+   - [x] pressureforce_fv_bouss            0.025059s **Marshall**
 - [ ] MOM.F90                              0.010023s
    - [ ] extract_surface_state             0.010023s
 - [ ] MOM_interface_heights.F90            0.010023s
@@ -263,3 +263,41 @@ loops in each that weren't ported as they weren't being used in `double_gyre`.
 by `zonal_mass_flux` and `meridional_mass_flux`, respectively and the
 `enter/exit data` statements in those subroutines mitigated the need for any
 transfers.
+
+## MOM_continuity_PPM.F90
+
+### `vertvisc_coef`  and `find_coupling_coef`
+
+`vertvisc_coef` uses a similar `jki` loop format like in `MOM_continuity_PPM.F90`.
+Inside the big `jki` loops, `find_coupling_coef` is called for each `j` iteration.
+Since in the continuity solver, separating the big `jki` loop into smaller `kji`
+loops resulted in poor CPU performance, I started off trying to use nested
+parallelism to port the `jki` loops in `vertvisc_coef`. I gave up on that pretty
+quickly because I kept getting CUDA memory errors, and couldn't find the source.
+
+I ended up porting these two subroutines by seperating out the loops as it was
+much easier to progressively port and check correctness. These loops were ported
+with `do concurrent`, which worked seamlessly and with good performance when
+coupled with appropriate data mapping clauses.
+
+### `vertvisc`
+
+Again, uses two `jki` loops - one perfomed on the u-points, and the other for the
+`v-points`. However, they were simpler than in `continuity_ppm` and `vertvisc-coef`
+as they didn't call any subroutines. This made it easier to try to port the entire
+`jki` using nested parallelism.
+
+In the process, I discovered a bug with NVHPC 25.3 when an allocatable array's
+allocation status is checked within an OpenMP ported loop ([my post on nvidia dev
+forums](https://forums.developer.nvidia.com/t/bug-nvhpc-25-3-and-checking-unallocated-fortran-arrays-in-openmp-target-loops/333128)).
+
+I ported `vertvisc` with both the nested parallelism strategy ([branch]
+(https://github.com/edoyango/MOM6/blob/e1db176d10b8fc0c464ba7fc52a9b9c77ca10e35/src/parameterizations/vertical/MOM_vert_friction.F90#L542)), 
+and the separated loop strategy ([branch](https://github.com/edoyango/MOM6/blob/cac9d83959bea5cbb30290f7a146668b685e53a8/src/parameterizations/vertical/MOM_vert_friction.F90#L542), 
+and found the latter to result in better performance (when tested using the 
+`benchmark` case).
+
+### `vertvisc_remnant`
+
+Like `vertvisc`, this consisted of simpler `jki` loops which I could port wholly
+using nested parallelism.
