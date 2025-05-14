@@ -276,7 +276,7 @@ repository includes a Makefile for building the executable.
    $ cd MOM6-examples/ocean_only
    $ CC=nvcc \
      FC=nvfortran \
-     FCFLAGS="-g -O0 -mp=gpu -Mnofma -Minfo=all" \
+     FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all" \
      LDFLAGS="-mp=gpu" \
      make -j
 
