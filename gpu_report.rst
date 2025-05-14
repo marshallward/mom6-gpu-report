@@ -10,28 +10,24 @@ MOM6 GPU Porting Guide
 This document describes the current state of porting MOM6 to GPU platforms.  We
 hope to provide essential context on the following questions.
 
-* Why should MOM6 be ported to GPUs?
+* Can MOM6 be ported to GPU devices?
 
-  * Will we always have access to this hardware?
-  * Could it become the *only* viable option for massively parallel jobs?
-  * Will we maintain support on CPU?  Could it become "legacy" hardware?
+* To what extent can we preserve the existing Fortran codebase?
 
 * What are the available technologies?  How suitable is each technology for
-  MOM6?  Some issues to consider:
+  MOM6?
 
-  * Can it faithfully represent the MOM6 algorithms?
-  * Is the code maintainable?  Or even readable?
-  * Do we have explict control over the implementation?
-  * Does it depend on a particular software stack?  Is it a sprawling mess?
-  * Can we preserve the existing codebase?
-  * Is the new implementation bit-equivalent to the CPU result?
+  * Can each option faithfully represent the MOM6 algorithms?
 
-We will try to address the questions above (over time, most likely).  For now,
-our conclusion is to preserve the existing codebase and introduce OpenMP
-directives.
+  * Can new contributors easily follow the GPU design patterns?
 
-The latter part of this document is intended to be a "how-to" for new users.
-We hope to include the following:
+  * Are GPU solutions bit-equivalent to the CPU result?
+
+We eventually hope to answer the questions above.
+
+This document is part position paper, part instruction manual, and part journal
+of day-to-day challenges and lessons learned.  Eventually, it should contain
+the following.
 
 * Instructions for compiling models with GPU support.  We currently focus on
   Nvidia, but should consider other platforms (AMD, possibly Intel?).
@@ -100,8 +96,8 @@ Kernel DSLs
 -----------
 
 CUDA and HIP are languages which target compilation to GPU bytecode.  They are
-primarily designed for particular platform, but they also aspire for some
-generality and there is some limited cross-platform support.
+primarily designed for a particular platform, but may aspire for some
+generality.  There is some limited cross-platform support.
 
 Program loops are written as kernels in the native language, which can be
 compiled into GPU bytecode.  These kernels are interfaced to a higher level
@@ -123,6 +119,27 @@ Languages like CUDA are not compiled into CPU bytecode, so a separate CPU
 implementation loop may be required for cross-platform support.
 
 
+Language Intrinsics
+-------------------
+
+Languages may provide intrinsic support for threading or parallelization.
+Fortran includes many examples, with ``do concurrent`` being the most relevant.
+
+.. code:: fortran
+
+   do concurrent (i=1:m, j=1:n, mask(:,:) > 0.)
+      u(i,j) = u(i,j) + dt * F(i,j)
+   end do
+
+Iterations within a ``do concurrent`` are assumed to be executed in an
+aribtrary order, and perhaps even in parallel.  It has recently been embraced
+by compiler developers as a mechanism for GPU migration.
+
+Support for ``do concurrent`` is not consistent across compilers, and some
+details may be interpreted differently.  But it is an attractive solution for
+building Fortran kernels.
+
+
 Other options
 -------------
 
@@ -139,26 +156,33 @@ have extensive APIs into various GPU kernel framework.
 Implementation in MOM6
 ----------------------
 
-MOM6 has opted to preserve its Fortran codebase and pursue a directive-based
-approach.
+MOM6 has opted to preserve its Fortran codebase and pursue a mixture of
+directives and ``do concurrent`` for kernel generation.
 
-Most of the options above require extensive rewrites in new languages, as
+Most of the options above would require extensive rewrites in new languages, as
 either a kernel-based DSL or a new high-level language.  The MOM6 codebase is
 very large -- over 200k lines -- and is being used in many research and
 forecasting systems.  The dynamic ALE vertical coordinate introduces solvers
 which are untested in these frameworks.  Any rewrite will require an additional
 infrastructure development, which will only increase the development cost.
 
-We are currently pursuing OpenMP directives.  OpenMP is a platform-independent
-language which is supported by all vendor compilers.  The other option,
-OpenACC, is primarily designed for Nvidia systems.  While there is limited
-support for OpenACC in both GCC and AMD compilers, the Intel compilers
-explicitly do not support OpenACC.
+.. TODO: CUDA/HIP could create vendor lock-in?
 
+The current approach is to rely on ``do concurrent`` for kernel generation and
+OpenMP directives for memory management.   We choose OpenMP over OpenACC for
+its platform independence.  Although we are currently focused on Nvidia,
+selecting OpenMP opens the possibility of other vendors.
+
+.. While there is limited support for OpenACC in both GCC and AMD compilers,
+   the Intel compilers explicitly do not support OpenACC.
 
 .. NOTE There are even reports that Nvidia compilers produce faster performance
    from OpenMP than its own OpenACC.  (Although I can't imagine why it would
    even differ...)
+
+.. raw:: latex
+
+   \newpage
 
 
 OpenMP support in MOM6
@@ -202,18 +226,20 @@ device.
 Enabling OpenMP Offloading
 --------------------------
 
-I am currently using the following flags.
+The following flags are used to enable GPU migration of OpenMP kernels.
 
-.. code:: make
 
-   FCFLAGS += -mp=gpu -Mnofma -Minfo=all
-   LDFLAGS += -mp=gpu
+OpenMP Support
+~~~~~~~~~~~~~~
 
 ``-mp=gpu``
-   This instructs the compiler to convert OpenMP directives to GPU bytecode.
+   This instructs the compiler to convert OpenMP ``target`` directives to GPU
+   kernels.
 
-  Both compiler and linker require ``-mp=gpu``.  Internally, the flag is used to
-  access CUDA libraries.
+   Note that the linker (``LD``) also requires ``-mp=gpu`` in order to link CUDA
+   library dependencies.
+
+.. TODO: Autoconf does not yet set LDFLAGS correctly?
 
 ``-Mnofma``
    This disables FMAs in the bytecode output, in both CPU and GPU.
@@ -223,13 +249,11 @@ I am currently using the following flags.
    CPU output, but the GPU output does not seem to respect parentheses when
    producing FMA output, and we see answer changes.
 
-   Until this is fixed on the compiler side, we much for now disable FMAs.
+   Until this is fixed on the compiler side, we must for now disable FMAs.
 
 ``-Minfo=all``
    Ths is not necessary, but provides interesting (if overwhelming) updates on
    GPU usage.
-
-.. TODO: Error for missing LDFLAGS?
 
 
 ``do concurrent`` Support
@@ -257,8 +281,12 @@ I am currently using the following flags.
 Non-Nvidia devices and Compilers
 --------------------------------
 
-I have not yet done any testing on AMD or Intel GPUs.  Consider this a
+We have not yet done any testing on AMD or Intel GPUs.  Consider this a
 placeholder for future documentation.
+
+.. raw:: latex
+
+   \newpage
 
 
 Testing in MOM6
@@ -276,11 +304,13 @@ repository includes a Makefile for building the executable.
    $ cd MOM6-examples/ocean_only
    $ CC=nvcc \
      FC=nvfortran \
-     FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all" \
+     FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=nomanaged" \
      LDFLAGS="-mp=gpu" \
      make -j
 
 (Not yet tested... but you get the idea.)
+
+(Replace ``-gpu=nomanaged`` with ``-gpu=mem:separate`` in newer compilers.)
 
 
 Procedure
@@ -318,9 +348,13 @@ process.
 At some point, we should extend our CI testing to GPUs, but this has proven to
 be a decent procedure for exploring OpenMP capability.
 
+.. raw:: latex
 
-MOM6 Directive Implementation
-=============================
+   \newpage
+
+
+MOM6 Kernel Implementation
+==========================
 
 This section will try to summarize what we have learned so far about GPU
 development and how to apply it to MOM6.  This is a summary of techniques --
@@ -338,6 +372,9 @@ loop at a time.
 
 Loop migration
 --------------
+
+(**NOTE:** We have since preferred ``do concurrent`` constructs over ``omp
+target`` regions.  But leaving these here for now...)
 
 The main task is to accumulate loops into GPU kernels for migration.   Each
 kernel is bounded by ``$!omp target`` directives.
@@ -742,6 +779,10 @@ TODO
 
 * ...?
 
+.. raw:: latex
+
+   \newpage
+
 
 Debugging and Profiling
 =======================
@@ -780,6 +821,11 @@ We need some tooling here.  We have no idea how memory is being used.  CUDA
 memory?  Unified memory?  In-chip?  (probably not).
 
 Most likely we are not using our memory well.
+
+
+.. raw:: latex
+
+   \newpage
 
 
 Miscellaneous
@@ -887,9 +933,6 @@ GCC 14.
 https://gcc.gnu.org/onlinedocs/gcc-13.1.0/libgomp/OpenMP-5_002e0.html
 
 
-
-
-
 Loop dependencies within a kernel
 ---------------------------------
 
@@ -946,6 +989,10 @@ OpenMP standard?)
 
 Redundant target update
 -----------------------
+
+*NOTE: This problem seems to have disappeared after switching to "do
+concurrent".  It was probably a memory transfer error somewhere.  Leaving it
+here for now, but may delete it.*
 
 Certain loops on GPU currently fail to reproduce the CPU numbers unless
 redundant ``!$omp target update`` is appled.  For example, see
