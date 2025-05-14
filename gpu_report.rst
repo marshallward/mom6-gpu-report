@@ -427,7 +427,7 @@ To move data from GPU back to CPU::
 
    !$omp target exit data map(from: x)
 
-**This will also deallocate x on the GPU.**
+**This decrements the reference counter to x by 1, but doesn't deallocate x on the GPU.**
 
 Arrays can be independently allocated or deleted on the GPU.  This block
 allocates ``h`` on the GPU but does not fill its data.
@@ -444,6 +444,13 @@ This block deallocates ``h`` on the GPU.
 
    deallocate(CS%h)
    !$omp target exit data map(delete: h)
+
+This decrements ``h`` reference counter on the GPU by 1. Decrementing references
+only deallocates the data if the number of references reaches 0.
+
+.. code:: fortran
+
+    !$omp target exit data map(release: h)
 
 If you want to exchange values between a array which already exists on the GPU,
 use ``update``.
