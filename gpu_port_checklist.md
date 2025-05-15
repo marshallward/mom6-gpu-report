@@ -24,13 +24,13 @@ subroutines/functions in those sources files which use up the most time.
    - [x] continuity_ppm                    0.0s      **Edward**
    - [x] continuity_zonal_convergence      0.0s      **Edward**
    - [x] zonal_edge_thickness              0.0s      **Edward**
-- [ ] MOM_barotropic.F90                   1.182772s
-   - [ ] btstep                            1.002349s
-   - [ ] set_local_bt_cont_types           0.080188s
-   - [ ] find_uhbt                         0.040094s
-   - [ ] find_vhbt                         0.040094s
-   - [ ] bt_mass_source                    0.010023s
-   - [ ] btcalc                            0.010023s
+- [ ] MOM_barotropic.F90                   1.182772s **Edward**
+   - [ ] btstep                            1.002349s **Edward**
+   - [ ] set_local_bt_cont_types           0.080188s **Edward**
+   - [ ] find_uhbt                         0.040094s **Edward**
+   - [ ] find_vhbt                         0.040094s **Edward**
+   - [ ] bt_mass_source                    0.010023s **Edward**
+   - [ ] btcalc                            0.010023s **Edward**
 - [x] MOM_vert_friction.F90                0.726703s **Edward** [**draft**](https://github.com/edoyango/MOM6/tree/vertvisc-gpu)
    - [x] vertvisc_coef                     0.355834s **Edward**
    - [x] vertvisc                          0.140329s **Edward**
