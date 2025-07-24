@@ -7,8 +7,8 @@ MOM6 GPU Porting Guide
 
 .. TODO: Cannot split author into a list?
 
-This document describes the current state of porting MOM6 to GPU platforms.  We
-hope to provide essential context on the following questions.
+This document describes the current state of porting MOM6 to GPU platforms.  It
+seeks to answer the following question.
 
 * Can MOM6 be ported to GPU devices?
 
@@ -23,14 +23,12 @@ hope to provide essential context on the following questions.
 
   * Are GPU solutions bit-equivalent to the CPU result?
 
-We eventually hope to answer the questions above.
-
 This document is part position paper, part instruction manual, and part journal
 of day-to-day challenges and lessons learned.  Eventually, it should contain
-the following.
+the following:
 
 * Instructions for compiling models with GPU support.  We currently focus on
-  Nvidia, but should consider other platforms (AMD, possibly Intel?).
+  Nvidia, but should consider other platforms (AMD, Intel).
 
 * Tutorial for using OpenMP for GPU migration, with a focus on MOM6.
 
@@ -45,13 +43,11 @@ Motivation
 ==========
 
 Utilizing new platforms
-
   GPUs represent a new compute device which we currently cannot use.  They are
   becoming widespread in HPC systems, and we are denying such users the ability
   to run MOM6.
 
 Performance improvements
-
   GPUs can provide higher throughput in certain situations.  A typical GPU
   device has a greater number of compute cores, and a job may run faster if its
   parallelization is greater than other costs such as reduced CPU speeds.
@@ -116,7 +112,7 @@ language such as C.
    vector_add<<n,1>>(a, b, c, d, n);
 
 Languages like CUDA are not compiled into CPU bytecode, so a separate CPU
-implementation loop may be required for cross-platform support.
+version of the code may be required for cross-platform support.
 
 
 Language Intrinsics
@@ -200,7 +196,9 @@ Current testing is using the Nvidia's ``nvfortran`` compiler.::
 Nvidia is transitioning to a new LLVM-based ``flang`` compiler.  Future major
 development efforts will be directed to ``flang``, including OpenMP support.
 
-We are currently testing on an Ampere A100 GPU.
+We currently have access to Volta V100, Ampere A100, and Hopper H100 cards.
+
+The ``nvidia-smi`` tool can be used to query the available device.
 
 .. code::
 
@@ -236,8 +234,8 @@ OpenMP Support
    This instructs the compiler to convert OpenMP ``target`` directives to GPU
    kernels.
 
-   Note that the linker (``LD``) also requires ``-mp=gpu`` in order to link CUDA
-   library dependencies.
+   Note that the linker (``LD``) also requires ``-mp=gpu`` in order to link
+   CUDA library dependencies.
 
 .. TODO: Autoconf does not yet set LDFLAGS correctly?
 
@@ -267,9 +265,9 @@ OpenMP Support
    run extremely slow for us.  When using do-concurrent, we want to disable
    managed memory.
 
-``-gpu=nomanaged``
+``-gpu=mem:separate``
    Disable managed memory and explicitly move arrays. Recent versions of NVHPC
-   will prefer ``-gpu=mem:separate``.
+   will prefer ``-gpu=nomanaged``.
 
    Despite being a major burden for the developer, this has so far proven to be
    the best option for us.
@@ -289,7 +287,7 @@ placeholder for future documentation.
    \newpage
 
 
-Testing in MOM6
+Getting Started
 ===============
 
 Compiling
@@ -300,17 +298,15 @@ repository includes a Makefile for building the executable.
 
 .. code:: sh
 
-   $ git clone https://github.com/NOAA-GFDL/MOM6-examples.git --recursive
-   $ cd MOM6-examples/ocean_only
-   $ CC=nvcc \
-     FC=nvfortran \
-     FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=nomanaged" \
-     LDFLAGS="-mp=gpu" \
-     make -j
+   git clone https://github.com/NOAA-GFDL/MOM6-examples.git --recursive
+   cd MOM6-examples/ocean_only
+   CC=nvcc \
+   FC=nvfortran \
+   FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=mem:separate" \
+   LDFLAGS="-mp=gpu" \
+   make -j
 
-(Not yet tested... but you get the idea.)
-
-(Replace ``-gpu=nomanaged`` with ``-gpu=mem:separate`` in newer compilers.)
+(Replace ``-gpu=mem:separate`` with ``-gpu=nomanaged`` in older compilers.)
 
 
 Procedure
