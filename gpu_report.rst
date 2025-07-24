@@ -344,6 +344,10 @@ process.
 At some point, we should extend our CI testing to GPUs, but this has proven to
 be a decent procedure for exploring OpenMP capability.
 
+**TODO** Running with ``compute-sanitizer`` is looking to be an essential
+development tool.  It is very similar to ``valgrind`` for CPU development.  But
+more info is needed.
+
 .. raw:: latex
 
    \newpage
