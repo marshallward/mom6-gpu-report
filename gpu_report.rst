@@ -370,6 +370,56 @@ for the entire run.  But the work will have to be done in pieces, often one
 loop at a time.
 
 
+A simple example
+----------------
+
+We current separate the model into kernels consisting of nested compute loops.
+Kernels are defined as ``do concurrent`` blocks.  For example, if we have a
+nested ``do``-loop,
+
+.. code:: fortran
+
+   do J=Jsq-1,Jeq+1 ; do I=Isq-1,Ieq+1
+     Area_q(i,j) = (Area_h(i,j) + Area_h(i+1,j+1)) + &
+                   (Area_h(i+1,j) + Area_h(i,j+1))
+   enddo ; enddo
+
+then we rewrite it as a single ``do-concurrent`` loop,
+
+.. code:: fortran
+
+   do concurrent (J=Jsq-1:Jeq+1, I=Isq-1:Ieq+1)
+     Area_q(i,j) = (Area_h(i,j) + Area_h(i+1,j+1)) + &
+                   (Area_h(i+1,j) + Area_h(i,j+1))
+   enddo
+
+then the compiler will produce GPU bytecode for the loop, and it will run on
+the GPU if available.
+
+If no other information is provided, then the compiler will automatically copy
+``Area_h`` to the GPU, and copy ``Area_q`` back to the host RAM.  But we can
+also include explicit memory transfer statements, as below.
+
+.. code:: fortran
+
+   !$omp target enter data map(to: Area_h)
+   !$omp target enter data map(alloc: Area_q)
+
+   do concurrent (J=Jsq-1:Jeq+1, I=Isq-1:Ieq+1)
+     Area_q(i,j) = (Area_h(i,j) + Area_h(i+1,j+1)) + &
+                   (Area_h(i+1,j) + Area_h(i,j+1))
+   enddo
+
+   !$omp target exit data map(delete: Area_h)
+   !$omp target exit data map(from: Area_q)
+
+As one can guess, the first two directives transfer ``Area_h`` to device and
+allocate space for ``Area_q``.  The final two directives transfer the updated
+``Area_q`` back to host and free the ``Area_h`` memory.
+
+
+
+
 Loop migration
 --------------
 
