@@ -300,7 +300,7 @@ repository includes a Makefile for building the executable.
 
    git clone https://github.com/NOAA-GFDL/MOM6-examples.git --recursive
    cd MOM6-examples/ocean_only
-   CC=nvcc \
+   CC=nvc \
    FC=nvfortran \
    FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=mem:separate" \
    LDFLAGS="-mp=gpu" \
