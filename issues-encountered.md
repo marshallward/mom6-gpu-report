@@ -2,6 +2,8 @@
 
 ## Compiling your own stuff 
 
+*attention* netcdf built with 25.5 won't be picked up by MOM if building MOM with nvhpc 24.9. You'll need versioned installs. sorry
+
 ```
 git clone git@github.com:Unidata/netcdf-fortran.git
 git clone git@github.com:Unidata/netcdf-c.git
