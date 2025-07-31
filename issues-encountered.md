@@ -1,0 +1,85 @@
+# ISSUES 
+
+## Compiling your own stuff 
+
+```
+git clone git@github.com:Unidata/netcdf-fortran.git
+git clone git@github.com:Unidata/netcdf-c.git
+export nvhpc_verno=25.5
+export NETCDFC_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-c
+export NETCDFF_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-fortran
+cd netcdf-c
+mkdir build
+cd build 
+cmake -DCMAKE_INSTALL_PREFIX=$NETCDFC_ROOT -DCMAKE_BUILD_TYPE=Release ../
+make -j install
+cd ../../netcdf-fortran 
+mkdir build
+cd build
+	cmake -DCMAKE_INSTALL_PREFIX=$NETCDFF_ROOT -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$NETCDFC_ROOT ../
+make -j install
+```
+
+Then...
+
+```
+#!/bin/bash
+
+export nvhpc_verno=25.5
+export NETCDFC_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-c
+export NETCDFF_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-fortran
+
+export PATH=$PATH:$NETCDFC_ROOT/bin
+export PATH=$PATH:$NETCDFF_ROOT/bin
+# check if your netcdf is pointing to lib64 or lib could be different
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$NETCDFC_ROOT/lib64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$NETCDFF_ROOT/lib64
+```
+
+Now you can source the above file and have netcdf loaded, yay. 
+
+
+## MPI related 
+
+```
+Authorization required, but no authorization protocol specified
+Authorization required, but no authorization protocol specified
+NOTE: MPP_DOMAINS_SET_STACK_SIZE: stack size set to    32768.
+ &MPP_IO_NML
+ HEADER_BUFFER_VAL =        16384,
+ GLOBAL_FIELD_ON_ROOT_PE =  T,
+ IO_CLOCKS_ON =  F,
+ SHUFFLE =            0,
+ DEFLATE_LEVEL =           -1,
+ CF_COMPLIANCE =  F
+ /
+NOTE: MPP_IO_SET_STACK_SIZE: stack size set to     131072.
+NOTE: ======== Model being driven by MOM_driver ========
+NOTE: callTree: o Program MOM_main, MOM_driver.F90
+
+FATAL: fms_affinity_set: OCEAN cpu_set size > allocated storage
+
+
+FATAL: fms_affinity_set: OCEAN cpu_set size > allocated storage
+
+--------------------------------------------------------------------------
+MPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD
+with errorcode 1.
+
+NOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.
+You may or may not see output from other processes, depending on
+exactly when Open MPI kills them.
+--------------------------------------------------------------------------
+```
+
+I've seen this error above when compiling with OpenMPI 5.0.5 on Gadi and both 4.1.4 and 5.0.5 on a personal machine. The solution was to run the MOM6 executable as `mpirun -np 1 ../build/MOM6` and ta-da
+
+## NVHPC Version related 
+
+### 25.5 
+
+On 25.5 building and running the `double-gyre` example works well. However, running the `benchmark` example produces mapping errors on the GPU values. Known bug, see [here](https://forums.developer.nvidia.com/t/bug-nvhpc-25-x-present-table-errors-with-fortran-do-concurrent-and-kind-of-nested-type-bound-procedures/333144)
+
+### 24.9 
+
+Both double gyre and benchmark seem to work well. 
