@@ -2,10 +2,19 @@
 
 Contents:
 
+- High level TODOs
 - MOM6-examples known issues on GPUs
 - MPI related issues
 - NVHPC versions issues
 - How to compile NetCDF using CMake
+
+
+## High level TODOs
+
+- MOM6 examples seems to struggle with FMS2
+- MOM6 examples does not use latest FMS2
+- FMS2 latest CMake build system does not have a way to build the unit tests
+- FMS2 autoconf build fails lots of unit tests when compiling with NVHPC
 
 ## MOM6-examples issues on GPUs 
 
