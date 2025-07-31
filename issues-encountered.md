@@ -1,44 +1,17 @@
 # ISSUES 
 
-## Compiling your own stuff 
+Contents:
 
-*attention* netcdf built with 25.5 won't be picked up by MOM if building MOM with nvhpc 24.9. You'll need versioned installs. sorry
+- MOM6-examples known issues on GPUs
+- MPI related issues
+- NVHPC versions issues
+- How to compile NetCDF using CMake
 
-```
-git clone git@github.com:Unidata/netcdf-fortran.git
-git clone git@github.com:Unidata/netcdf-c.git
-export nvhpc_verno=25.5
-export NETCDFC_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-c
-export NETCDFF_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-fortran
-cd netcdf-c
-mkdir build
-cd build 
-cmake -DCMAKE_INSTALL_PREFIX=$NETCDFC_ROOT -DCMAKE_BUILD_TYPE=Release ../
-make -j install
-cd ../../netcdf-fortran 
-mkdir build
-cd build
-	cmake -DCMAKE_INSTALL_PREFIX=$NETCDFF_ROOT -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$NETCDFC_ROOT ../
-make -j install
-```
+## MOM6-examples issues on GPUs 
 
-Then...
+The version of FMS2 that is the default in MOM6 examples seems to be giving problems. You have to switch back to FMS1 by modifying the Makefile in `ocean_only` to point to FMS1: `FMS_CODEBASE ?= ../src/FMS1` 
 
-```
-#!/bin/bash
-
-export nvhpc_verno=25.5
-export NETCDFC_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-c
-export NETCDFF_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-fortran
-
-export PATH=$PATH:$NETCDFC_ROOT/bin
-export PATH=$PATH:$NETCDFF_ROOT/bin
-# check if your netcdf is pointing to lib64 or lib could be different
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$NETCDFC_ROOT/lib64
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$NETCDFF_ROOT/lib64
-```
-
-Now you can source the above file and have netcdf loaded, yay. 
+### FMS2 detailed issues (to be added)
 
 
 ## MPI related 
@@ -85,3 +58,43 @@ On 25.5 building and running the `double-gyre` example works well. However, runn
 ### 24.9 
 
 Both double gyre and benchmark seem to work well. 
+
+## Compiling your own stuff 
+
+*attention* netcdf built with 25.5 won't be picked up by MOM if building MOM with nvhpc 24.9. You'll need versioned installs. sorry
+
+```
+git clone git@github.com:Unidata/netcdf-fortran.git
+git clone git@github.com:Unidata/netcdf-c.git
+export nvhpc_verno=25.5
+export NETCDFC_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-c
+export NETCDFF_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-fortran
+cd netcdf-c
+mkdir build
+cd build 
+cmake -DCMAKE_INSTALL_PREFIX=$NETCDFC_ROOT -DCMAKE_BUILD_TYPE=Release ../
+make -j install
+cd ../../netcdf-fortran 
+mkdir build
+cd build
+	cmake -DCMAKE_INSTALL_PREFIX=$NETCDFF_ROOT -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$NETCDFC_ROOT ../
+make -j install
+```
+
+Then...
+
+```
+#!/bin/bash
+
+export nvhpc_verno=25.5
+export NETCDFC_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-c
+export NETCDFF_ROOT=$PSCRATCH/install/nvfortran/${nvhpc_verno}/netcdf-fortran
+
+export PATH=$PATH:$NETCDFC_ROOT/bin
+export PATH=$PATH:$NETCDFF_ROOT/bin
+# check if your netcdf is pointing to lib64 or lib could be different
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$NETCDFC_ROOT/lib64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$NETCDFF_ROOT/lib64
+```
+
+Now you can source the above file and have netcdf loaded, yay. 
