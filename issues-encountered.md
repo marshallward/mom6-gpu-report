@@ -58,6 +58,13 @@ exactly when Open MPI kills them.
 
 I've seen this error above when compiling with OpenMPI 5.0.5 on Gadi and both 4.1.4 and 5.0.5 on a personal machine. The solution was to run the MOM6 executable as `mpirun -np 1 ../build/MOM6` and ta-da
 
+### Tested MPI versions 
+
+- Openmpi
+  - 4.1.4
+  - 4.1.7
+  - 5.0.5 
+
 ## NVHPC Version related 
 
 ### 25.5 
