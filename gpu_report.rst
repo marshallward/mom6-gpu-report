@@ -302,7 +302,7 @@ repository includes a Makefile for building the executable.
    cd MOM6-examples/ocean_only
    CC=nvc \
    FC=nvfortran \
-   FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=mem:separate" \
+   FCFLAGS="-gopt -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=mem:separate" \
    LDFLAGS="-mp=gpu" \
    make -j
 
