@@ -67,6 +67,10 @@ I've seen this error above when compiling with OpenMPI 5.0.5 on Gadi and both 4.
 
 ## NVHPC Version related 
 
+### Compute sanitizer and opt flags 
+
+Apparently using `-g` does not just add debug symbols but it might also hinder optimization. We have to use `-gopt`
+
 ### 25.5 
 
 On 25.5 building and running the `double-gyre` example works well. However, running the `benchmark` example produces mapping errors on the GPU values. Known bug, see [here](https://forums.developer.nvidia.com/t/bug-nvhpc-25-x-present-table-errors-with-fortran-do-concurrent-and-kind-of-nested-type-bound-procedures/333144)
