@@ -5,7 +5,7 @@ Below are a list of subroutines/functions that are used in the `double_gyre`
 test - sorted first by source files which use up the most CPU time, then by the
 subroutines/functions in those sources files which use up the most time.
 
-- [x] MOM_continuity_PPM.F90               1.207831s **Edward** [**first draft**](https://github.com/edoyango/MOM6/tree/fuse-loops-gpu-port)
+- [x] MOM_continuity_PPM.F90               1.207831s **Edward**
    - [x] meridional_flux_adjust            0.205482s **Edward**
    - [x] zonal_flux_adjust                 0.170399s **Edward**
    - [x] zonal_flux_layer                  0.095223s **Edward**
@@ -31,24 +31,22 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] find_vhbt                         0.040094s **Edward**
    - [ ] bt_mass_source                    0.010023s **Edward**
    - [ ] btcalc                            0.010023s **Edward**
-- [x] MOM_vert_friction.F90                0.726703s **Edward** [**draft**](https://github.com/edoyango/MOM6/tree/vertvisc-gpu)
-   - [x] vertvisc_coef                     0.355834s **Edward**
-   - [x] vertvisc                          0.140329s **Edward**
-   - [x] vertvisc_remnant                  0.120282s **Edward**
-   - [x] find_coupling_coef                0.075176s **Edward**
-   - [x] vertvisc_limit_vel                0.035082s **Edward**
+- [ ] MOM_vert_friction.F90                0.726703s **Jorge**
+   - [ ] vertvisc_coef                     0.355834s **Jorge**
+   - [ ] vertvisc                          0.140329s **Jorge**
+   - [ ] vertvisc_remnant                  0.120282s **Jorge**
+   - [ ] find_coupling_coef                0.075176s **Jorge**
+   - [ ] vertvisc_limit_vel                0.035082s **Jorge**
 - [x] MOM_hor_visc.F90                     0.200470s **Marshall**
    - [x] horizontal_viscosity              0.200470s **Marshall**
 - [x] MOM_CoriolisAdv.F90                  0.125294s **Marshall**
    - [x] coradcalc                         0.090211s **Marshall**
    - [x] gradke                            0.035082s **Marshall**
-- [ ] diag_manager.F90                     0.070164s
-   - [ ] send_data_3d                      0.070164s
 - [ ] MOM_set_viscosity.F90                0.055129s
    - [ ] set_viscous_bbl                   0.055129s
-- [ ] MOM_dynamics_split_RK2.F90           0.035082s **Marshall**
-   - [ ] step_mom_dyn_split_rk2            0.030070s **Marshall**
-   - [ ] register_restarts_dyn_split_rk2   0.005012s **Marshall**
+- [ ] MOM_dynamics_split_RK2.F90           0.035082s
+   - [ ] step_mom_dyn_split_rk2            0.030070s
+   - [ ] register_restarts_dyn_split_rk2   0.005012s
 - [x] MOM_PressureForce_FV.F90             0.025059s **Marshall**
    - [x] pressureforce_fv_bouss            0.025059s **Marshall**
 - [ ] MOM.F90                              0.010023s
@@ -57,6 +55,13 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] find_eta_2d                       0.005012s
    - [ ] find_eta_3d                       0.005012s
    - [ ] thickness_to_dz_3d                0.0s
+
+## Other diagnostic and data transfer subroutines
+
+We'll worry about these after the dynamic core above is ported. The comms in particular require changes to made in FMS/MPP.
+
+- [ ] diag_manager.F90                     0.070164s
+   - [ ] send_data_3d                      0.070164s
 - [ ] MOM_coms.F90                         0.010023s
    - [ ] increment_ints_faster             0.010023s
 - [ ] mpp_comm_api.inc                     0.005012s
