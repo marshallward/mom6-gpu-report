@@ -31,6 +31,7 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] find_vhbt                         0.040094s **Edward**
    - [ ] bt_mass_source                    0.010023s **Edward**
    - [ ] btcalc                            0.010023s **Edward**
+   - [ ] set_dtbt
 - [ ] MOM_vert_friction.F90                0.726703s **Jorge**
    - [ ] vertvisc_coef                     0.355834s **Jorge**
    - [ ] vertvisc                          0.140329s **Jorge**
@@ -44,6 +45,7 @@ subroutines/functions in those sources files which use up the most time.
    - [x] gradke                            0.035082s **Marshall**
 - [ ] MOM_set_viscosity.F90                0.055129s
    - [ ] set_viscous_bbl                   0.055129s
+   - [ ] set_viscous_ML
 - [ ] MOM_dynamics_split_RK2.F90           0.035082s
    - [ ] step_mom_dyn_split_rk2            0.030070s
    - [ ] register_restarts_dyn_split_rk2   0.005012s
@@ -55,6 +57,7 @@ subroutines/functions in those sources files which use up the most time.
    - [ ] find_eta_2d                       0.005012s
    - [ ] find_eta_3d                       0.005012s
    - [ ] thickness_to_dz_3d                0.0s
+   - [ ] thickness_to_dz_jslice
 
 ## Other diagnostic and data transfer subroutines
 
