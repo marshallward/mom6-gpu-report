@@ -299,14 +299,14 @@ repository includes a Makefile for building the executable.
 .. code:: sh
 
    git clone https://github.com/NOAA-GFDL/MOM6-examples.git --recursive
-   cd MOM6-examples/ocean_only
-   CC=nvc \
-   FC=nvfortran \
-   FCFLAGS="-g -O0 -mp=gpu -stdpar=gpu -Mnofma -Minfo=all -gpu=mem:separate" \
-   LDFLAGS="-mp=gpu" \
+   cd MOM6-examples/shared/fms
+   export CC=nvc FC=nvfortran FCFLAGS="-g -O0 -mp=gpu -Mnofma -Minfo=all -gpu=mem:separate" LDFLAGS="-mp=gpu"
+   make -j
+   cd ../../ocean_only
+   export FCFLAGS="-stdpar=gpu $FCFLAGS"
    make -j
 
-(Replace ``-gpu=mem:separate`` with ``-gpu=nomanaged`` in older compilers.)
+Replace ``-gpu=mem:separate`` with ``-gpu=nomanaged`` in older compilers.
 
 
 Procedure
