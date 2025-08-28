@@ -24,14 +24,14 @@ subroutines/functions in those sources files which use up the most time.
    - [x] continuity_ppm                    0.0s      **Edward**
    - [x] continuity_zonal_convergence      0.0s      **Edward**
    - [x] zonal_edge_thickness              0.0s      **Edward**
-- [ ] MOM_barotropic.F90                   1.182772s **Edward**
-   - [ ] btstep                            1.002349s **Edward**
-   - [ ] set_local_bt_cont_types           0.080188s **Edward**
-   - [ ] find_uhbt                         0.040094s **Edward**
-   - [ ] find_vhbt                         0.040094s **Edward**
-   - [ ] bt_mass_source                    0.010023s **Edward**
-   - [ ] btcalc                            0.010023s **Edward**
-   - [ ] set_dtbt
+- [x] MOM_barotropic.F90                   1.182772s **Edward**
+   - [x] btstep                            1.002349s **Edward**
+   - [x] set_local_bt_cont_types           0.080188s **Edward**
+   - [x] find_uhbt                         0.040094s **Edward**
+   - [x] find_vhbt                         0.040094s **Edward**
+   - [x] bt_mass_source                    0.010023s **Edward**
+   - [x] btcalc                            0.010023s **Edward**
+   - [x] set_dtbt                                    **Edward**
 - [ ] MOM_vert_friction.F90                0.726703s **Jorge**
    - [ ] vertvisc_coef                     0.355834s **Jorge**
    - [ ] vertvisc                          0.140329s **Jorge**
@@ -46,9 +46,9 @@ subroutines/functions in those sources files which use up the most time.
 - [ ] MOM_set_viscosity.F90                0.055129s
    - [ ] set_viscous_bbl                   0.055129s
    - [ ] set_viscous_ML
-- [ ] MOM_dynamics_split_RK2.F90           0.035082s
-   - [ ] step_mom_dyn_split_rk2            0.030070s
-   - [ ] register_restarts_dyn_split_rk2   0.005012s
+- [ ] MOM_dynamics_split_RK2.F90           0.035082s **Jorge**
+   - [ ] step_mom_dyn_split_rk2            0.030070s **Jorge**
+   - [ ] register_restarts_dyn_split_rk2   0.005012s **Jorge**
 - [x] MOM_PressureForce_FV.F90             0.025059s **Marshall**
    - [x] pressureforce_fv_bouss            0.025059s **Marshall**
 - [ ] MOM.F90                              0.010023s
