@@ -770,7 +770,12 @@ its entire contents can be run on the GPU, and we still encounter a lot of
 constructs which do not work.
 
 If the procedure contains local arrays, those arrays are allocated on the GPU
-heap which degrades performance.
+heap which degrades performance.  Additionally, this memory is limited, so if
+you jump into a subroutine that allocates lots of static arrays, it doesn't take
+much to OOM (see relevant `NVIDIA forum post`_). Furthermore, jumping into a
+target subroutine segfaults when an argument is a pointer.
+
+.. _NVIDIA forum post: https://forums.developer.nvidia.com/t/issue-with-automatic-array-in-device-subroutine-defined-with-openacc-directive/245873/2
 
 .. code:: fortran
 
@@ -1315,19 +1320,3 @@ subroutine can be utilized:
 
       call do_something(...)
    enddo
-
-
-Problems with nested parallelism
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Shared memory is limited on GPUs (24-48kB per block/team for NVIDIA). 
-  Exceeding shared memory will degrade performance as arrays go into global memory.
-* GPU static memory is limited, so if you jump into a subroutine that allocates
-  lots of static arrays, it doesn't take much to OOM (see relevant `NVIDIA forum post`_).
-* Jumping into a target subroutine segfaults when an argument is a pointer.
-* I get incorrect results when the ``parallel do`` inside a target subroutine is
-  coupled with ``collapse()``.
-* I've found that explicit nested parallelism performs meaningfully worse than
-  refactoring the loops into separate ``kji`` blocks.
-
-.. _NVIDIA forum post: https://forums.developer.nvidia.com/t/issue-with-automatic-array-in-device-subroutine-defined-with-openacc-directive/245873/2
