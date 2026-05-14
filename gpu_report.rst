@@ -249,7 +249,7 @@ OpenMP Support
 
 ``-Minfo=all``
    Ths is not necessary, but provides interesting (if overwhelming) updates on
-   GPU usage. Offload related information can be selected with `mp,accel`.
+   GPU usage.  Offload related information can be selected with ``mp,accel``.
 
 
 ``do concurrent`` Support
@@ -399,7 +399,7 @@ parallelized loops (``i``, ``j``).
        v_bc_accel(i,J,k) = (CS%CAv_pred(i,J,k) + CS%PFv(i,J,k)) + CS%diffv(i,J,k)
      enddo ; enddo
    enddo
-   !$omp end target
+   !$omp end target teams
 
 Kernel is bounded by ``!$omp target`` ... ``!$omp end target``.  This defines a
 unit of execution on the GPU.  A kernel can contain multiple loops.
@@ -446,8 +446,8 @@ A possibly faster form of the previous loop is shown below.
 The ``simd`` directs the team to use SIMD-like instructions over the threads.
 This is almost always the default behavior, so it is often omitted.
 
-Note that as of `14th May, 2026` AMD and Intel compilers recognises the `loop`
-directive, but leads to incorrect results in nested parallism contexts.
+Note that as of 14th May, 2026 AMD and Intel compilers recognize the ``loop``
+directive, but it leads to incorrect results in nested parallelism contexts.
 
 
 Data Migration
@@ -804,12 +804,13 @@ Useful offload and loop patterns
 --------------------------------
 
 Multiple successive loops
-^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If there are multiple loops in quick succession, it can be beneficial to group them
 into a single kernel by placing them in a single target region:
 
 .. code:: fortran
+
    !$omp target teams
    !$omp distribute parallel do collapse(2) ! or !$omp loop collapse(2)
    do i=is,ie ; do j=js,je
@@ -822,38 +823,36 @@ into a single kernel by placing them in a single target region:
    enddo ; enddo
    !$omp end target teams
 
-It's generally useful to specify number of teams in the outer target teams directive.
+It's generally useful to specify the number of teams in the outer target teams directive.
 Note that AMD + Intel prefer ``distribute parallel do`` inside, whereas NVIDIA
-prefers ``loop`.
+prefers ``loop``.
 
 Note that if the loops have data dependencies, correct results are only guaranteed if
-the loop indices are same between the loops with data dependencies.  E.g., if the
+the loop indices are the same between the loops with data dependencies.  E.g., if the
 above example used ``a`` instead of ``c`` in the second loop, it would give incorrect
-results is the loop indices aren't guaranteed to line up.
+results if the loop indices aren't guaranteed to line up.
 
 
 JKI loops for column reductions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This style of loops are used extensively in MOM6.
+This loop style is used extensively in MOM6.
 
-.. code: fortran
+.. code:: fortran
 
    !$omp target teams distribute ! or !$omp target teams loop for NVIDIA
-   do j=is,ie
+   do j=js,je
      do k=1,nz
        !$omp parallel do         ! or !$omp loop for NVIDIA
        do i=is,ie
          a(i,j) = a(i,j) + b(i,j,k)
        enddo
      enddo
-     !$omp parallel do           ! or !$omp loop for NVIDIA
-     
    enddo
 
 ``do concurrent`` for the j and i loops would also work with NVIDIA. To get the
 maximum parallelism with OpenMP, it's important to specify the number of threads via
-the `thread_limit` clause. Otherwise, the compiler will give all the i iterations to
+the ``thread_limit`` clause. Otherwise, the compiler will give all the i iterations to
 teams of 128 (NVIDIA) or 256 (AMD) threads. And if the i-dimension is larger than
 the team size, then some threads do repeated iterations in serial instead of in
 parallel.
@@ -863,7 +862,7 @@ procedure, performance is usually quite poor.
 
 
 Loop blocking
-^^^^^^^^^^^^^
+~~~~~~~~~~~~~
 
 The above JKI loop ordering is very prevalent in MOM6.  For GPU porting, it is often
 desirable to refactor them because they either have routine calls inside (degrading
@@ -871,7 +870,7 @@ performance), or they use a polymorphic type bound procedure (e.g. for EOS
 calculations).  Tiling does a lot to alleviate this. Converting from JKI to tiling
 means:
 
-.. code: fortran
+.. code:: fortran
 
    !$omp target teams distribute
    do j=js,je
@@ -904,7 +903,8 @@ means:
 This loop pattern tends to perform well on both CPU and GPU.  There is additionally
 the potential to leverage GPU shared memory with the approach if the temporary
 arrays are block-sized, the block sizes are known at compile time, and these
-temporary arrays are declared private to each team.
+temporary arrays are declared private to each team. Only NVIDIA seems to leverage
+this however.
 
 A limitation experienced with this approach so far is for multiple levels of routine
 nesting, the compiler fails when trying to compile this tiled code.  An alternative
@@ -913,12 +913,12 @@ large loops gives ok performance.
 
 
 Column-wise loops (aka JIK loops)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A lot of the calculations in MOM6 can be rearranged as column-wise calculations (i.e.
 outer ji loop, with inner k loop(s)).
 
-.. code: fortran
+.. code:: fortran
 
    !$omp target teams distribute parallel do collapse(2)
    do j=js,je
@@ -941,16 +941,16 @@ GPU architectures, the JIK loop ordering is fastest.
 Known Issues
 ============
 
-* procedures in ``omp loop`` or ``do concurrent` regions can give incorrect
+* procedures in ``omp loop`` or ``do concurrent`` regions can give incorrect
   results.  Solution is to inline the procedure with ``-Minline=name:<procedure>``.
 
 * Updating (``!$omp target update to``) derived types with allocatable members on the
-  device can make render the allocatable members useful.  This sometimes manifests as
+  device can make the allocatable members unusable.  This sometimes manifests as
   a segfault.  Solution is to replace the update with a map delete, followed by map to.
 
 * type bound procedures used in offloaded loops not compilable on GPU.
 
-* Transcandental functions (``exp sin cos tan`` etc.) not bitwise reproducible between
+* Transcendental functions (``exp sin cos tan`` etc.) not bitwise reproducible between
   CPU and GPU.
 
 TODO
