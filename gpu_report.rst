@@ -76,12 +76,10 @@ allows an existing codebase to be compiled to CPU and GPU targets.
 
 .. code:: fortran
 
-   !$omp target
-   !$omp parallel loop
+   !$omp target teams distribute parallel do
    do i = 1, N
       a(i) = b(i) * c(i) + d(i)
    enddo
-   !$omp end target
 
 Directive support is not universal across vendor compilers.  It is not always
 possible to tune a loop to a particular device.  If there are too many
@@ -123,7 +121,7 @@ Fortran includes many examples, with ``do concurrent`` being the most relevant.
 
 .. code:: fortran
 
-   do concurrent (i=1:m, j=1:n, mask(:,:) > 0.)
+   do concurrent (i=1:m, j=1:n, mask(i,j) > 0.)
       u(i,j) = u(i,j) + dt * F(i,j)
    end do
 
@@ -251,7 +249,7 @@ OpenMP Support
 
 ``-Minfo=all``
    Ths is not necessary, but provides interesting (if overwhelming) updates on
-   GPU usage.
+   GPU usage. Offload related information can be selected with `mp,accel`.
 
 
 ``do concurrent`` Support
@@ -279,8 +277,13 @@ OpenMP Support
 Non-Nvidia devices and Compilers
 --------------------------------
 
-We have not yet done any testing on AMD or Intel GPUs.  Consider this a
-placeholder for future documentation.
+AMD and Intel base their compilers on Flang, so their level of support is
+similar. 
+
+Both ``amdflang`` and ``ifx`` support the "old style" OpenMP loop directives
+(``!$omp target teams distribute parallel do``), but the do concurrent and the
+newer ``loop`` OpenMP clauses aren't well supported. This is in contrast to
+NVIDIA, where the opposite is true.
 
 .. raw:: latex
 
@@ -384,14 +387,14 @@ parallelized loops (``i``, ``j``).
 
 .. code:: fortran
 
-   !$omp target
+   !$omp target teams
    do k=1,nz
-     !$omp parallel loop collapse(2)
+     !$omp distribute parallel do collapse(2)
      do j=js,je ; do I=Isq,Ieq
        u_bc_accel(I,j,k) = (CS%CAu_pred(I,j,k) + CS%PFu(I,j,k)) + CS%diffu(I,j,k)
      enddo ; enddo
 
-     !$omp parallel loop collapse(2)
+     !$omp distribute parallel do collapse(2)
      do J=Jsq,Jeq ; do i=is,ie
        v_bc_accel(i,J,k) = (CS%CAv_pred(i,J,k) + CS%PFv(i,J,k)) + CS%diffv(i,J,k)
      enddo ; enddo
@@ -406,17 +409,20 @@ This can presumably avoid pipelining issues across dimensions.  For now, this
 should be considered an optimization and not required for porting.
 
 
-The ``!$omp parallel loop`` Directive
+The ``!$omp loop`` Directive
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This directive is a relatively new addition to OpenMP.  It can be considered
-shorthand for the following directive::
+This directive is a relatively new addition to OpenMP.  It says that the
+attached loop can be parallelised.  How it can be parallelised is left up to
+the compiler.
+
+The older style loop directive is::
 
    !omp teams distribute parallel do simd
 
 ``teams`` are collections of threads with shared resources.  In an Nvidia GPU,
-the teams are SM processors, and loops is parallelized over the threads of the
-SM processor.
+the teams are thread blocks, and loops are parallelized over the threads of the
+blocks.
 
 A possibly faster form of the previous loop is shown below.
 
@@ -440,8 +446,8 @@ A possibly faster form of the previous loop is shown below.
 The ``simd`` directs the team to use SIMD-like instructions over the threads.
 This is almost always the default behavior, so it is often omitted.
 
-Note that as of `9th April, 2025` AMD compilers don't understand the `loop`
-directive.
+Note that as of `14th May, 2026` AMD and Intel compilers recognises the `loop`
+directive, but leads to incorrect results in nested parallism contexts.
 
 
 Data Migration
@@ -689,7 +695,7 @@ happening in that subroutine:
 .. code:: bash
 
    NV_ACC_NOTIFY=2 ../build/MOM6 2>&1 > mom6-dump.txt
-   grep zonal_flux_layer | sort mom6-dump.txt | uniq -c | sort -n
+   grep zonal_flux_layer mom6-dump.txt | sort | uniq -c | sort -n
 
 Which yields the number of transfers for a particular variable in ascending
 order:
@@ -763,15 +769,193 @@ This has not been very useful in practice.  A procedure can only be compiled if
 its entire contents can be run on the GPU, and we still encounter a lot of
 constructs which do not work.
 
+If the procedure contains local arrays, those arrays are allocated on the GPU
+heap which degrades performance.
+
+.. code:: fortran
+
+   !$omp target loop collapse(2)
+   do j=1, Nj
+     call something(arr(:,j), Ni)
+   enddo
+
+   subroutine something(arr, Ni)
+     integer, intent(in):: Ni, Nj
+     real, intent(inout):: arr(Ni)
+     real:: tmp(Ni) ! this will be allocated on heap and be slow!
+
+     tmp(:) = arr(:) + 1
+     arr(:) = tmp(:)
+   end subroutine something
+
+Suggested fixes are: declare with compile-time size, or pass these arrays in as
+private.  For example, passing a private variable in:
+
+.. code:: fortran
+
+   real:: tmp(Ni)
+   !$omp target loop collapse(2) private(tmp)
+   do j=1, Nj
+     call something(arr(:,j), tmp, Ni)
+   enddo
+
+
+Useful offload and loop patterns
+--------------------------------
+
+Multiple successive loops
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If there are multiple loops in quick succession, it can be beneficial to group them
+into a single kernel by placing them in a single target region:
+
+.. code:: fortran
+   !$omp target teams
+   !$omp distribute parallel do collapse(2) ! or !$omp loop collapse(2)
+   do i=is,ie ; do j=js,je
+     a(i,j) = b(i,j) + 1
+   enddo ; enddo
+
+   !$omp distribute parallel do collapse(2) ! or !$omp loop collapse(2)
+   do i=isc,iec ; do j=jsc,jec
+     c(i,j) = c(i,j) + d(i,j)
+   enddo ; enddo
+   !$omp end target teams
+
+It's generally useful to specify number of teams in the outer target teams directive.
+Note that AMD + Intel prefer ``distribute parallel do`` inside, whereas NVIDIA
+prefers ``loop`.
+
+Note that if the loops have data dependencies, correct results are only guaranteed if
+the loop indices are same between the loops with data dependencies.  E.g., if the
+above example used ``a`` instead of ``c`` in the second loop, it would give incorrect
+results is the loop indices aren't guaranteed to line up.
+
+
+JKI loops for column reductions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This style of loops are used extensively in MOM6.
+
+.. code: fortran
+
+   !$omp target teams distribute ! or !$omp target teams loop for NVIDIA
+   do j=is,ie
+     do k=1,nz
+       !$omp parallel do         ! or !$omp loop for NVIDIA
+       do i=is,ie
+         a(i,j) = a(i,j) + b(i,j,k)
+       enddo
+     enddo
+     !$omp parallel do           ! or !$omp loop for NVIDIA
+     
+   enddo
+
+``do concurrent`` for the j and i loops would also work with NVIDIA. To get the
+maximum parallelism with OpenMP, it's important to specify the number of threads via
+the `thread_limit` clause. Otherwise, the compiler will give all the i iterations to
+teams of 128 (NVIDIA) or 256 (AMD) threads. And if the i-dimension is larger than
+the team size, then some threads do repeated iterations in serial instead of in
+parallel.
+
+Another disadvantage of JKI loops is that if the inner i-iterations are handled in a
+procedure, performance is usually quite poor.
+
+
+Loop blocking
+^^^^^^^^^^^^^
+
+The above JKI loop ordering is very prevalent in MOM6.  For GPU porting, it is often
+desirable to refactor them because they either have routine calls inside (degrading
+performance), or they use a polymorphic type bound procedure (e.g. for EOS
+calculations).  Tiling does a lot to alleviate this. Converting from JKI to tiling
+means:
+
+.. code: fortran
+
+   !$omp target teams distribute
+   do j=js,je
+     do k=1,nz
+       !$omp parallel do
+       do i=is,ie
+         a(i,j) = a(i,j) + b(i,j,k)
+       enddo
+     enddo
+   enddo
+
+   ! tiling
+   nblockj = 32
+   nblocki = 4
+   !$omp target teams distribute collapse(2) private(iend,jend)
+   do jstart=js,je,nblockj               ! starting j index for each block
+     do istart=is,ie,nblocki             !          i
+       jend = min(jstart+nblockj-1, je)  ! ending j index for each block
+       iend = min(istart+nblocki-1, ie)  !        i
+       !$omp parallel do collapse(2)
+       do j=jstart,jend
+         do i=istart,iend
+           a(i,j) = a(i,j) + b(i,j,k)
+         enddo
+       enddo
+     enddo
+   enddo
+
+
+This loop pattern tends to perform well on both CPU and GPU.  There is additionally
+the potential to leverage GPU shared memory with the approach if the temporary
+arrays are block-sized, the block sizes are known at compile time, and these
+temporary arrays are declared private to each team.
+
+A limitation experienced with this approach so far is for multiple levels of routine
+nesting, the compiler fails when trying to compile this tiled code.  An alternative
+to giving blocks to each GPU, is to use a block size of the whole domain as multiple
+large loops gives ok performance.
+
+
+Column-wise loops (aka JIK loops)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A lot of the calculations in MOM6 can be rearranged as column-wise calculations (i.e.
+outer ji loop, with inner k loop(s)).
+
+.. code: fortran
+
+   !$omp target teams distribute parallel do collapse(2)
+   do j=js,je
+     do i=is,ie
+       do k=1,nz
+         a(i,j) = a(i,j) + b(i,j,k)
+       enddo
+     enddo
+   enddo
+
+
+This isn't done in the current MOM6 code because the arrays are ijk ordered, so the
+loops would be accessing memory out-of-order. However, this is only true for CPU and
+not GPU. This is because if there's no branching, each team's threads work in lockstep,
+so for the first k iteration, thread 1 is accessing ``a(1,1), b(1,1,1)`` and thread 2
+is accessing ``a(2,1), b(2,1,1)`` - which are sequential in memory! Hence, for all
+GPU architectures, the JIK loop ordering is fastest.
+
 
 Known Issues
 ============
 
+* procedures in ``omp loop`` or ``do concurrent` regions can give incorrect
+  results.  Solution is to inline the procedure with ``-Minline=name:<procedure>``.
+
+* Updating (``!$omp target update to``) derived types with allocatable members on the
+  device can make render the allocatable members useful.  This sometimes manifests as
+  a segfault.  Solution is to replace the update with a map delete, followed by map to.
+
+* type bound procedures used in offloaded loops not compilable on GPU.
+
+* Transcandental functions (``exp sin cos tan`` etc.) not bitwise reproducible between
+  CPU and GPU.
+
 TODO
 
 * Procedure pointers
-
-* Type-bound procedures (both static and virtual functions)
 
 * Complex derived types (esp. the open boundary conditions)
 
@@ -811,7 +995,7 @@ Sadly, most errors are either generic
   Typically this means that an array is not on the device or an allocated array
   or array section hasn't been freed e.g. in an exit data statement.
 
-*
+* 
 
 
 Memory monitoring
